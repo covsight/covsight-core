@@ -1,0 +1,47 @@
+{
+  "format": "ncdb-dump-v1",
+  "history": [],
+  "scopes": [
+    {
+      "children": [
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "items": [
+                        {
+                          "atLeast": 1,
+                          "count": 42,
+                          "coverType": 1,
+                          "name": "leaf_bin"
+                        }
+                      ],
+                      "name": "level_4",
+                      "type": 16384
+                    }
+                  ],
+                  "items": [],
+                  "name": "level_3",
+                  "type": 16384
+                }
+              ],
+              "items": [],
+              "name": "level_2",
+              "type": 16384
+            }
+          ],
+          "items": [],
+          "name": "level_1",
+          "type": 16384
+        }
+      ],
+      "items": [],
+      "name": "level_0",
+      "type": 4096
+    }
+  ]
+}

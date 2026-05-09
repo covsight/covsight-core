@@ -1,0 +1,26 @@
+{
+  "format": "ncdb-dump-v1",
+  "history": [],
+  "scopes": [
+    {
+      "children": [
+        {
+          "children": [],
+          "items": [
+            {
+              "atLeast": 1,
+              "count": 7,
+              "coverType": 1,
+              "name": "bin0"
+            }
+          ],
+          "name": "cp0",
+          "type": 16384
+        }
+      ],
+      "items": [],
+      "name": "cg_minimal",
+      "type": 4096
+    }
+  ]
+}

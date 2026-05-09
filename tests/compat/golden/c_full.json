@@ -1,0 +1,441 @@
+{
+  "format": "ncdb-dump-v1",
+  "history": [
+    {
+      "kind": "TEST",
+      "name": "smoke"
+    },
+    {
+      "kind": "TEST",
+      "name": "regression"
+    }
+  ],
+  "scopes": [
+    {
+      "children": [],
+      "items": [],
+      "name": "top",
+      "type": 16777216
+    },
+    {
+      "children": [
+        {
+          "children": [
+            {
+              "children": [],
+              "items": [
+                {
+                  "atLeast": 1,
+                  "count": 0,
+                  "coverType": 1,
+                  "name": "bin_0"
+                },
+                {
+                  "atLeast": 1,
+                  "count": 1,
+                  "coverType": 1,
+                  "name": "bin_1"
+                },
+                {
+                  "atLeast": 1,
+                  "count": 2,
+                  "coverType": 1,
+                  "name": "bin_2"
+                },
+                {
+                  "atLeast": 1,
+                  "count": 3,
+                  "coverType": 1,
+                  "name": "bin_3"
+                },
+                {
+                  "atLeast": 1,
+                  "count": 4,
+                  "coverType": 1,
+                  "name": "bin_4"
+                }
+              ],
+              "name": "cp_0",
+              "type": 16384
+            },
+            {
+              "children": [],
+              "items": [
+                {
+                  "atLeast": 1,
+                  "count": 5,
+                  "coverType": 1,
+                  "name": "bin_0"
+                },
+                {
+                  "atLeast": 1,
+                  "count": 6,
+                  "coverType": 1,
+                  "name": "bin_1"
+                },
+                {
+                  "atLeast": 1,
+                  "count": 7,
+                  "coverType": 1,
+                  "name": "bin_2"
+                },
+                {
+                  "atLeast": 1,
+                  "count": 8,
+                  "coverType": 1,
+                  "name": "bin_3"
+                },
+                {
+                  "atLeast": 1,
+                  "count": 9,
+                  "coverType": 1,
+                  "name": "bin_4"
+                }
+              ],
+              "name": "cp_1",
+              "type": 16384
+            },
+            {
+              "children": [],
+              "items": [
+                {
+                  "atLeast": 1,
+                  "count": 10,
+                  "coverType": 1,
+                  "name": "bin_0"
+                },
+                {
+                  "atLeast": 1,
+                  "count": 11,
+                  "coverType": 1,
+                  "name": "bin_1"
+                },
+                {
+                  "atLeast": 1,
+                  "count": 12,
+                  "coverType": 1,
+                  "name": "bin_2"
+                },
+                {
+                  "atLeast": 1,
+                  "count": 13,
+                  "coverType": 1,
+                  "name": "bin_3"
+                },
+                {
+                  "atLeast": 1,
+                  "count": 14,
+                  "coverType": 1,
+                  "name": "bin_4"
+                }
+              ],
+              "name": "cp_2",
+              "type": 16384
+            }
+          ],
+          "items": [],
+          "name": "cg_0",
+          "type": 4096
+        },
+        {
+          "children": [
+            {
+              "children": [],
+              "items": [
+                {
+                  "atLeast": 1,
+                  "count": 15,
+                  "coverType": 1,
+                  "name": "bin_0"
+                },
+                {
+                  "atLeast": 1,
+                  "count": 16,
+                  "coverType": 1,
+                  "name": "bin_1"
+                },
+                {
+                  "atLeast": 1,
+                  "count": 17,
+                  "coverType": 1,
+                  "name": "bin_2"
+                },
+                {
+                  "atLeast": 1,
+                  "count": 18,
+                  "coverType": 1,
+                  "name": "bin_3"
+                },
+                {
+                  "atLeast": 1,
+                  "count": 19,
+                  "coverType": 1,
+                  "name": "bin_4"
+                }
+              ],
+              "name": "cp_0",
+              "type": 16384
+            },
+            {
+              "children": [],
+              "items": [
+                {
+                  "atLeast": 1,
+                  "count": 20,
+                  "coverType": 1,
+                  "name": "bin_0"
+                },
+                {
+                  "atLeast": 1,
+                  "count": 21,
+                  "coverType": 1,
+                  "name": "bin_1"
+                },
+                {
+                  "atLeast": 1,
+                  "count": 22,
+                  "coverType": 1,
+                  "name": "bin_2"
+                },
+                {
+                  "atLeast": 1,
+                  "count": 23,
+                  "coverType": 1,
+                  "name": "bin_3"
+                },
+                {
+                  "atLeast": 1,
+                  "count": 24,
+                  "coverType": 1,
+                  "name": "bin_4"
+                }
+              ],
+              "name": "cp_1",
+              "type": 16384
+            },
+            {
+              "children": [],
+              "items": [
+                {
+                  "atLeast": 1,
+                  "count": 25,
+                  "coverType": 1,
+                  "name": "bin_0"
+                },
+                {
+                  "atLeast": 1,
+                  "count": 26,
+                  "coverType": 1,
+                  "name": "bin_1"
+                },
+                {
+                  "atLeast": 1,
+                  "count": 27,
+                  "coverType": 1,
+                  "name": "bin_2"
+                },
+                {
+                  "atLeast": 1,
+                  "count": 28,
+                  "coverType": 1,
+                  "name": "bin_3"
+                },
+                {
+                  "atLeast": 1,
+                  "count": 29,
+                  "coverType": 1,
+                  "name": "bin_4"
+                }
+              ],
+              "name": "cp_2",
+              "type": 16384
+            }
+          ],
+          "items": [],
+          "name": "cg_1",
+          "type": 4096
+        }
+      ],
+      "items": [],
+      "name": "top",
+      "type": 16
+    },
+    {
+      "children": [
+        {
+          "children": [],
+          "items": [
+            {
+              "atLeast": 2,
+              "count": 0,
+              "coverType": 1,
+              "name": "lo"
+            },
+            {
+              "atLeast": 2,
+              "count": 5,
+              "coverType": 1,
+              "name": "hi"
+            }
+          ],
+          "name": "cp0",
+          "type": 16384
+        }
+      ],
+      "items": [],
+      "name": "cg_al",
+      "type": 4096
+    },
+    {
+      "children": [],
+      "items": [],
+      "name": "top",
+      "type": 16777216
+    },
+    {
+      "children": [
+        {
+          "children": [],
+          "items": [
+            {
+              "atLeast": 0,
+              "count": 3,
+              "coverType": 512,
+              "name": "0 -> 1"
+            },
+            {
+              "atLeast": 0,
+              "count": 2,
+              "coverType": 512,
+              "name": "1 -> 0"
+            }
+          ],
+          "name": "sig_valid",
+          "type": 2
+        }
+      ],
+      "items": [],
+      "name": "top",
+      "type": 16
+    },
+    {
+      "children": [
+        {
+          "children": [],
+          "items": [
+            {
+              "atLeast": 1,
+              "count": 1,
+              "coverType": 1,
+              "name": "b0"
+            }
+          ],
+          "name": "cp0",
+          "type": 16384
+        }
+      ],
+      "items": [],
+      "name": "cg_h",
+      "type": 4096
+    },
+    {
+      "children": [
+        {
+          "children": [],
+          "items": [
+            {
+              "atLeast": 1,
+              "count": 1,
+              "coverType": 1,
+              "name": "a0"
+            },
+            {
+              "atLeast": 1,
+              "count": 2,
+              "coverType": 1,
+              "name": "a1"
+            }
+          ],
+          "name": "cp_a",
+          "type": 16384
+        },
+        {
+          "children": [],
+          "items": [
+            {
+              "atLeast": 1,
+              "count": 3,
+              "coverType": 1,
+              "name": "b0"
+            },
+            {
+              "atLeast": 1,
+              "count": 4,
+              "coverType": 1,
+              "name": "b1"
+            }
+          ],
+          "name": "cp_b",
+          "type": 16384
+        },
+        {
+          "children": [],
+          "items": [
+            {
+              "atLeast": 1,
+              "count": 5,
+              "coverType": 2097152,
+              "name": "a0_x_b0"
+            }
+          ],
+          "name": "x_ab",
+          "type": 32768
+        }
+      ],
+      "items": [],
+      "name": "cg_cross",
+      "type": 4096
+    },
+    {
+      "children": [
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [],
+                      "items": [
+                        {
+                          "atLeast": 1,
+                          "count": 42,
+                          "coverType": 1,
+                          "name": "leaf_bin"
+                        }
+                      ],
+                      "name": "level_4",
+                      "type": 16384
+                    }
+                  ],
+                  "items": [],
+                  "name": "level_3",
+                  "type": 16384
+                }
+              ],
+              "items": [],
+              "name": "level_2",
+              "type": 16384
+            }
+          ],
+          "items": [],
+          "name": "level_1",
+          "type": 16384
+        }
+      ],
+      "items": [],
+      "name": "level_0",
+      "type": 4096
+    }
+  ]
+}

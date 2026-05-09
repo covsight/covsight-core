@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=68.0", "setuptools-scm"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "covsight-core"
+dynamic = ["version"]
+requires-python = ">=3.10"
+description = "Core UCIS data-model API and NCDB format for coverage data"
+license = "Apache-2.0"
+dependencies = []
+# NOTE: covsight-core has ZERO runtime dependencies.
+# The NCDB C accelerator is optional and built via cffi at install time.
+
+[project.optional-dependencies]
+accel = ["cffi>=1.15"]
+dev = ["pytest>=7.0", "pytest-cov"]
+
+[project.entry-points."covsight.formats.db"]
+ncdb = "covsight.core.ncdb.format_plugin:NcdbFormatPlugin"
+
+[tool.setuptools.packages.find]
+where = ["python"]
+
+[tool.setuptools.package-data]
+"covsight.core.schema" = ["*.json", "*.yaml", "*.schema", "*.xsd"]
+
+[tool.setuptools_scm]
+root = "."
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

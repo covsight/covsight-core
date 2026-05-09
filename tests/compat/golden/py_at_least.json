@@ -1,0 +1,32 @@
+{
+  "format": "ncdb-dump-v1",
+  "history": [],
+  "scopes": [
+    {
+      "children": [
+        {
+          "children": [],
+          "items": [
+            {
+              "atLeast": 2,
+              "count": 0,
+              "coverType": 1,
+              "name": "lo"
+            },
+            {
+              "atLeast": 2,
+              "count": 5,
+              "coverType": 1,
+              "name": "hi"
+            }
+          ],
+          "name": "cp0",
+          "type": 16384
+        }
+      ],
+      "items": [],
+      "name": "cg_al",
+      "type": 4096
+    }
+  ]
+}

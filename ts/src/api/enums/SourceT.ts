@@ -1,0 +1,15 @@
+export enum SourceT {
+  VHDL = 0,
+  VLOG,
+  SV,
+  SYSTEMC,
+  PSL_VHDL,
+  PSL_VLOG,
+  PSL_SV,
+  PSL_SYSTEMC,
+  E,
+  VERA,
+  NONE,
+  OTHER,
+  SOURCE_ERROR,
+}

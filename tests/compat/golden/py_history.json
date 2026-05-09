@@ -1,0 +1,35 @@
+{
+  "format": "ncdb-dump-v1",
+  "history": [
+    {
+      "kind": "TEST",
+      "name": "smoke"
+    },
+    {
+      "kind": "TEST",
+      "name": "regression"
+    }
+  ],
+  "scopes": [
+    {
+      "children": [
+        {
+          "children": [],
+          "items": [
+            {
+              "atLeast": 1,
+              "count": 1,
+              "coverType": 1,
+              "name": "b0"
+            }
+          ],
+          "name": "cp0",
+          "type": 16384
+        }
+      ],
+      "items": [],
+      "name": "cg_h",
+      "type": 4096
+    }
+  ]
+}

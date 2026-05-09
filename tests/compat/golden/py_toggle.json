@@ -1,0 +1,38 @@
+{
+  "format": "ncdb-dump-v1",
+  "history": [],
+  "scopes": [
+    {
+      "children": [],
+      "items": [],
+      "name": "top",
+      "type": 16777216
+    },
+    {
+      "children": [
+        {
+          "children": [],
+          "items": [
+            {
+              "atLeast": 0,
+              "count": 3,
+              "coverType": 512,
+              "name": "0 -> 1"
+            },
+            {
+              "atLeast": 0,
+              "count": 2,
+              "coverType": 512,
+              "name": "1 -> 0"
+            }
+          ],
+          "name": "sig_valid",
+          "type": 2
+        }
+      ],
+      "items": [],
+      "name": "top",
+      "type": 16
+    }
+  ]
+}

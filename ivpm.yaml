@@ -1,0 +1,10 @@
+package:
+  name: covsight-core
+
+  dep-sets:
+  - name: default
+    deps:
+    - name: minizip-ng
+      url: https://github.com/zlib-ng/minizip-ng/archive/refs/tags/4.2.1.tar.gz
+    - name: cjson
+      url: https://github.com/DaveGamble/cJSON/archive/refs/tags/v1.7.19.tar.gz

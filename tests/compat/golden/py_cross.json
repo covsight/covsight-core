@@ -1,0 +1,64 @@
+{
+  "format": "ncdb-dump-v1",
+  "history": [],
+  "scopes": [
+    {
+      "children": [
+        {
+          "children": [],
+          "items": [
+            {
+              "atLeast": 1,
+              "count": 1,
+              "coverType": 1,
+              "name": "a0"
+            },
+            {
+              "atLeast": 1,
+              "count": 2,
+              "coverType": 1,
+              "name": "a1"
+            }
+          ],
+          "name": "cp_a",
+          "type": 16384
+        },
+        {
+          "children": [],
+          "items": [
+            {
+              "atLeast": 1,
+              "count": 3,
+              "coverType": 1,
+              "name": "b0"
+            },
+            {
+              "atLeast": 1,
+              "count": 4,
+              "coverType": 1,
+              "name": "b1"
+            }
+          ],
+          "name": "cp_b",
+          "type": 16384
+        },
+        {
+          "children": [],
+          "items": [
+            {
+              "atLeast": 1,
+              "count": 5,
+              "coverType": 2097152,
+              "name": "a0_x_b0"
+            }
+          ],
+          "name": "x_ab",
+          "type": 32768
+        }
+      ],
+      "items": [],
+      "name": "cg_cross",
+      "type": 4096
+    }
+  ]
+}
