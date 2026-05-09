@@ -4,9 +4,15 @@
   "scopes": [
     {
       "children": [],
+      "crossed_points": null,
+      "goal": -1,
       "items": [],
       "name": "foo",
-      "type": 16777216
+      "source_file": null,
+      "source_line": 0,
+      "source_token": 0,
+      "type": 16777216,
+      "weight": 1
     },
     {
       "children": [
@@ -14,6 +20,8 @@
           "children": [
             {
               "children": [],
+              "crossed_points": null,
+              "goal": -1,
               "items": [
                 {
                   "atLeast": 1,
@@ -23,17 +31,33 @@
                 }
               ],
               "name": "cp0",
-              "type": 16384
+              "source_file": "rtl/foo.sv",
+              "source_line": 11,
+              "source_token": 5,
+              "type": 16384,
+              "weight": 1
             }
           ],
+          "crossed_points": null,
+          "goal": -1,
           "items": [],
           "name": "cg_src",
-          "type": 4096
+          "source_file": "rtl/foo.sv",
+          "source_line": 10,
+          "source_token": 0,
+          "type": 4096,
+          "weight": 1
         }
       ],
+      "crossed_points": null,
+      "goal": -1,
       "items": [],
       "name": "foo",
-      "type": 16
+      "source_file": null,
+      "source_line": 0,
+      "source_token": 0,
+      "type": 16,
+      "weight": 1
     }
   ]
 }

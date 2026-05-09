@@ -96,12 +96,35 @@ struct ncdb_scope_s {
     struct ncdb_scope_s **children;
     size_t child_count;
     size_t child_cap;
+    /* CROSS: references to crossed coverpoint scopes (not owned) */
+    struct ncdb_scope_s **crossed_points;
+    size_t crossed_count;
+    size_t crossed_cap;
 };
 
 struct ncdb_history_node_s {
     uint32_t kind;
     char *logical_name;
     char *physical_name;
+    /* TestData fields */
+    char    *user_name;
+    char    *seed;
+    char    *tool_category;
+    char    *comment;
+    char    *date;
+    char    *run_cwd;
+    char    *cmd;
+    char    *args;
+    char    *time_unit;
+    char    *vendor_id;
+    char    *vendor_tool;
+    char    *vendor_tool_version;
+    char    *same_tests;
+    uint32_t test_status;
+    int      compulsory;
+    double   sim_time;
+    double   cpu_time;
+    double   cost;
 };
 
 struct ncdb_s {
@@ -141,6 +164,7 @@ int ncdb_impl_add_source(ncdbT db, const char *path);
 int ncdb_impl_get_source_id(ncdbT db, const char *path, int create);
 size_t ncdb_impl_count_scopes(ncdbT db);
 size_t ncdb_impl_count_covers(ncdbT db);
+int ncdb_impl_add_cross_point(ncdbScopeT cross_scope, ncdbScopeT cp);
 
 uint32_t ncdb_cover_default_flags(uint64_t cover_type);
 uint64_t ncdb_cover_default_at_least(uint64_t cover_type);

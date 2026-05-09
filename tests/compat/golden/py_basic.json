@@ -4,9 +4,15 @@
   "scopes": [
     {
       "children": [],
+      "crossed_points": null,
+      "goal": -1,
       "items": [],
       "name": "top",
-      "type": 16777216
+      "source_file": null,
+      "source_line": 0,
+      "source_token": 0,
+      "type": 16777216,
+      "weight": 1
     },
     {
       "children": [
@@ -14,6 +20,8 @@
           "children": [
             {
               "children": [],
+              "crossed_points": null,
+              "goal": -1,
               "items": [
                 {
                   "atLeast": 1,
@@ -47,10 +55,16 @@
                 }
               ],
               "name": "cp_0",
-              "type": 16384
+              "source_file": null,
+              "source_line": 0,
+              "source_token": 0,
+              "type": 16384,
+              "weight": 1
             },
             {
               "children": [],
+              "crossed_points": null,
+              "goal": -1,
               "items": [
                 {
                   "atLeast": 1,
@@ -84,10 +98,16 @@
                 }
               ],
               "name": "cp_1",
-              "type": 16384
+              "source_file": null,
+              "source_line": 0,
+              "source_token": 0,
+              "type": 16384,
+              "weight": 1
             },
             {
               "children": [],
+              "crossed_points": null,
+              "goal": -1,
               "items": [
                 {
                   "atLeast": 1,
@@ -121,17 +141,29 @@
                 }
               ],
               "name": "cp_2",
-              "type": 16384
+              "source_file": null,
+              "source_line": 0,
+              "source_token": 0,
+              "type": 16384,
+              "weight": 1
             }
           ],
+          "crossed_points": null,
+          "goal": -1,
           "items": [],
           "name": "cg_0",
-          "type": 4096
+          "source_file": "rtl/top.sv",
+          "source_line": 1,
+          "source_token": 0,
+          "type": 4096,
+          "weight": 1
         },
         {
           "children": [
             {
               "children": [],
+              "crossed_points": null,
+              "goal": -1,
               "items": [
                 {
                   "atLeast": 1,
@@ -165,10 +197,16 @@
                 }
               ],
               "name": "cp_0",
-              "type": 16384
+              "source_file": null,
+              "source_line": 0,
+              "source_token": 0,
+              "type": 16384,
+              "weight": 1
             },
             {
               "children": [],
+              "crossed_points": null,
+              "goal": -1,
               "items": [
                 {
                   "atLeast": 1,
@@ -202,10 +240,16 @@
                 }
               ],
               "name": "cp_1",
-              "type": 16384
+              "source_file": null,
+              "source_line": 0,
+              "source_token": 0,
+              "type": 16384,
+              "weight": 1
             },
             {
               "children": [],
+              "crossed_points": null,
+              "goal": -1,
               "items": [
                 {
                   "atLeast": 1,
@@ -239,17 +283,33 @@
                 }
               ],
               "name": "cp_2",
-              "type": 16384
+              "source_file": null,
+              "source_line": 0,
+              "source_token": 0,
+              "type": 16384,
+              "weight": 1
             }
           ],
+          "crossed_points": null,
+          "goal": -1,
           "items": [],
           "name": "cg_1",
-          "type": 4096
+          "source_file": "rtl/top.sv",
+          "source_line": 1,
+          "source_token": 0,
+          "type": 4096,
+          "weight": 1
         }
       ],
+      "crossed_points": null,
+      "goal": -1,
       "items": [],
       "name": "top",
-      "type": 16
+      "source_file": null,
+      "source_line": 0,
+      "source_token": 0,
+      "type": 16,
+      "weight": 1
     }
   ]
 }

@@ -95,8 +95,12 @@ def scenario_history(db: MemUCIS) -> None:
     cg = db.createScope("cg_h", None, 1, None, ScopeTypeT.COVERGROUP, 0)
     cp = cg.createCoverpoint("cp0", None, 1, None)
     cp.createBin("b0", None, 1, 1, "", CoverTypeT.CVGBIN)
-    db.createHistoryNode(None, "smoke", None, HistoryNodeKind.TEST)
-    db.createHistoryNode(None, "regression", None, HistoryNodeKind.TEST)
+    h1 = db.createHistoryNode(None, "smoke", None, HistoryNodeKind.TEST)
+    h1.setUserName("alice"); h1.setSeed("42")
+    h1.setToolCategory("sim"); h1.setComment("smoke run")
+    h2 = db.createHistoryNode(None, "regression", None, HistoryNodeKind.TEST)
+    h2.setUserName("bob"); h2.setSeed("99")
+    h2.setToolCategory("sim"); h2.setComment("full regression")
 
 
 def scenario_cross(db: MemUCIS) -> None:
@@ -129,23 +133,45 @@ def scenario_full(db: MemUCIS) -> None:
     scenario_deep(db)
 
 
+def scenario_unicode_names(db: MemUCIS) -> None:
+    cg = db.createScope("cg_αβγ", None, 1, None, ScopeTypeT.COVERGROUP, 0)
+    cp = cg.createCoverpoint("cp_café", None, 1, None)
+    cp.createBin("bin_日本語", None, 1, 3, "", CoverTypeT.CVGBIN)
+
+
+def scenario_large_count(db: MemUCIS) -> None:
+    cg = db.createScope("cg_large", None, 1, None, ScopeTypeT.COVERGROUP, 0)
+    cp = cg.createCoverpoint("cp0", None, 1, None)
+    cp.createBin("big_bin", None, 1, 2**32, "", CoverTypeT.CVGBIN)
+
+
+def scenario_weight_goal(db: MemUCIS) -> None:
+    cg = db.createScope("cg_wg", None, 2, None, ScopeTypeT.COVERGROUP, 0)
+    cg.setGoal(80)
+    cp = cg.createCoverpoint("cp0", None, 1, None)
+    cp.createBin("b0", None, 1, 1, "", CoverTypeT.CVGBIN)
+
+
 SCENARIO_FNS = {
-    "empty":       scenario_empty,
-    "minimal":     scenario_minimal,
-    "basic":       scenario_basic,
-    "at_least":    scenario_at_least,
-    "toggle":      scenario_toggle,
-    "source_info": scenario_source_info,
-    "history":     scenario_history,
-    "cross":       scenario_cross,
-    "deep":        scenario_deep,
-    "full":        scenario_full,
+    "empty":         scenario_empty,
+    "minimal":       scenario_minimal,
+    "basic":         scenario_basic,
+    "at_least":      scenario_at_least,
+    "toggle":        scenario_toggle,
+    "source_info":   scenario_source_info,
+    "history":       scenario_history,
+    "cross":         scenario_cross,
+    "deep":          scenario_deep,
+    "full":          scenario_full,
+    "unicode_names": scenario_unicode_names,
+    "large_count":   scenario_large_count,
+    "weight_goal":   scenario_weight_goal,
 }
 
-#: Scenarios supported by all three implementations (C lacks source_info)
+#: Scenarios supported by all three implementations
 SCENARIOS_ALL = list(SCENARIO_FNS.keys())
-#: Scenarios where C writer can fully participate
-SCENARIOS_C = [s for s in SCENARIOS_ALL if s != "source_info"]
+#: Scenarios where C writer can fully participate (now includes source_info)
+SCENARIOS_C = SCENARIOS_ALL
 
 # ---------------------------------------------------------------------------
 # Helpers: canonical JSON dump
@@ -163,11 +189,33 @@ def _scope_to_dict(scope) -> dict:
             "coverType": int(d.type),
             "name":      ci.getName(),
         })
+    weight = scope.getWeight() if hasattr(scope, 'getWeight') else 1
+    goal   = scope.getGoal()   if hasattr(scope, 'getGoal')   else -1
+    src_file  = None
+    src_line  = 0
+    src_token = 0
+    if hasattr(scope, 'getSourceInfo'):
+        si = scope.getSourceInfo()
+        if si is not None and si.file is not None:
+            src_file  = si.file.getFileName()
+            src_line  = int(si.line)  if si.line  is not None else 0
+            src_token = int(si.token) if si.token is not None else 0
+    crossed_points = None
+    if int(scope.getScopeType()) == int(ScopeTypeT.CROSS) and hasattr(scope, 'getNumCrossedCoverpoints'):
+        n = scope.getNumCrossedCoverpoints()
+        if n > 0:
+            crossed_points = [scope.getIthCrossedCoverpoint(i).getScopeName() for i in range(n)]
     return {
         "children": children,
-        "items":    items,
-        "name":     scope.getScopeName(),
-        "type":     int(scope.getScopeType()),
+        "goal":        int(goal)   if goal   is not None else -1,
+        "items":       items,
+        "name":        scope.getScopeName(),
+        "source_file":  src_file,
+        "source_line":  src_line,
+        "source_token": src_token,
+        "type":        int(scope.getScopeType()),
+        "weight":      int(weight) if weight is not None else 1,
+        "crossed_points": crossed_points,
     }
 
 
@@ -183,8 +231,12 @@ def db_to_dict(db: MemUCIS) -> dict:
     history = []
     for node in db.historyNodes(HistoryNodeKind.ALL):
         history.append({
-            "kind": _KIND_MAP.get(int(node.getKind()), "TEST"),
-            "name": node.getLogicalName(),
+            "kind":          _KIND_MAP.get(int(node.getKind()), "TEST"),
+            "name":          node.getLogicalName(),
+            "user_name":     node.getUserName(),
+            "seed":          node.getSeed(),
+            "tool_category": node.getToolCategory(),
+            "comment":       node.getComment(),
         })
     return {"format": "ncdb-dump-v1", "history": history, "scopes": scopes}
 

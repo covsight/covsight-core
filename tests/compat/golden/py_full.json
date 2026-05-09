@@ -2,20 +2,34 @@
   "format": "ncdb-dump-v1",
   "history": [
     {
+      "comment": "smoke run",
       "kind": "TEST",
-      "name": "smoke"
+      "name": "smoke",
+      "seed": "42",
+      "tool_category": "sim",
+      "user_name": "alice"
     },
     {
+      "comment": "full regression",
       "kind": "TEST",
-      "name": "regression"
+      "name": "regression",
+      "seed": "99",
+      "tool_category": "sim",
+      "user_name": "bob"
     }
   ],
   "scopes": [
     {
       "children": [],
+      "crossed_points": null,
+      "goal": -1,
       "items": [],
       "name": "top",
-      "type": 16777216
+      "source_file": null,
+      "source_line": 0,
+      "source_token": 0,
+      "type": 16777216,
+      "weight": 1
     },
     {
       "children": [
@@ -23,6 +37,8 @@
           "children": [
             {
               "children": [],
+              "crossed_points": null,
+              "goal": -1,
               "items": [
                 {
                   "atLeast": 1,
@@ -56,10 +72,16 @@
                 }
               ],
               "name": "cp_0",
-              "type": 16384
+              "source_file": null,
+              "source_line": 0,
+              "source_token": 0,
+              "type": 16384,
+              "weight": 1
             },
             {
               "children": [],
+              "crossed_points": null,
+              "goal": -1,
               "items": [
                 {
                   "atLeast": 1,
@@ -93,10 +115,16 @@
                 }
               ],
               "name": "cp_1",
-              "type": 16384
+              "source_file": null,
+              "source_line": 0,
+              "source_token": 0,
+              "type": 16384,
+              "weight": 1
             },
             {
               "children": [],
+              "crossed_points": null,
+              "goal": -1,
               "items": [
                 {
                   "atLeast": 1,
@@ -130,17 +158,29 @@
                 }
               ],
               "name": "cp_2",
-              "type": 16384
+              "source_file": null,
+              "source_line": 0,
+              "source_token": 0,
+              "type": 16384,
+              "weight": 1
             }
           ],
+          "crossed_points": null,
+          "goal": -1,
           "items": [],
           "name": "cg_0",
-          "type": 4096
+          "source_file": "rtl/top.sv",
+          "source_line": 1,
+          "source_token": 0,
+          "type": 4096,
+          "weight": 1
         },
         {
           "children": [
             {
               "children": [],
+              "crossed_points": null,
+              "goal": -1,
               "items": [
                 {
                   "atLeast": 1,
@@ -174,10 +214,16 @@
                 }
               ],
               "name": "cp_0",
-              "type": 16384
+              "source_file": null,
+              "source_line": 0,
+              "source_token": 0,
+              "type": 16384,
+              "weight": 1
             },
             {
               "children": [],
+              "crossed_points": null,
+              "goal": -1,
               "items": [
                 {
                   "atLeast": 1,
@@ -211,10 +257,16 @@
                 }
               ],
               "name": "cp_1",
-              "type": 16384
+              "source_file": null,
+              "source_line": 0,
+              "source_token": 0,
+              "type": 16384,
+              "weight": 1
             },
             {
               "children": [],
+              "crossed_points": null,
+              "goal": -1,
               "items": [
                 {
                   "atLeast": 1,
@@ -248,22 +300,40 @@
                 }
               ],
               "name": "cp_2",
-              "type": 16384
+              "source_file": null,
+              "source_line": 0,
+              "source_token": 0,
+              "type": 16384,
+              "weight": 1
             }
           ],
+          "crossed_points": null,
+          "goal": -1,
           "items": [],
           "name": "cg_1",
-          "type": 4096
+          "source_file": "rtl/top.sv",
+          "source_line": 1,
+          "source_token": 0,
+          "type": 4096,
+          "weight": 1
         }
       ],
+      "crossed_points": null,
+      "goal": -1,
       "items": [],
       "name": "top",
-      "type": 16
+      "source_file": null,
+      "source_line": 0,
+      "source_token": 0,
+      "type": 16,
+      "weight": 1
     },
     {
       "children": [
         {
           "children": [],
+          "crossed_points": null,
+          "goal": -1,
           "items": [
             {
               "atLeast": 2,
@@ -279,23 +349,41 @@
             }
           ],
           "name": "cp0",
-          "type": 16384
+          "source_file": null,
+          "source_line": 0,
+          "source_token": 0,
+          "type": 16384,
+          "weight": 1
         }
       ],
+      "crossed_points": null,
+      "goal": -1,
       "items": [],
       "name": "cg_al",
-      "type": 4096
+      "source_file": null,
+      "source_line": 0,
+      "source_token": 0,
+      "type": 4096,
+      "weight": 1
     },
     {
       "children": [],
+      "crossed_points": null,
+      "goal": -1,
       "items": [],
       "name": "top",
-      "type": 16777216
+      "source_file": null,
+      "source_line": 0,
+      "source_token": 0,
+      "type": 16777216,
+      "weight": 1
     },
     {
       "children": [
         {
           "children": [],
+          "crossed_points": null,
+          "goal": -1,
           "items": [
             {
               "atLeast": 0,
@@ -311,17 +399,29 @@
             }
           ],
           "name": "sig_valid",
-          "type": 2
+          "source_file": null,
+          "source_line": 0,
+          "source_token": 0,
+          "type": 2,
+          "weight": 1
         }
       ],
+      "crossed_points": null,
+      "goal": -1,
       "items": [],
       "name": "top",
-      "type": 16
+      "source_file": null,
+      "source_line": 0,
+      "source_token": 0,
+      "type": 16,
+      "weight": 1
     },
     {
       "children": [
         {
           "children": [],
+          "crossed_points": null,
+          "goal": -1,
           "items": [
             {
               "atLeast": 1,
@@ -331,17 +431,29 @@
             }
           ],
           "name": "cp0",
-          "type": 16384
+          "source_file": null,
+          "source_line": 0,
+          "source_token": 0,
+          "type": 16384,
+          "weight": 1
         }
       ],
+      "crossed_points": null,
+      "goal": -1,
       "items": [],
       "name": "cg_h",
-      "type": 4096
+      "source_file": null,
+      "source_line": 0,
+      "source_token": 0,
+      "type": 4096,
+      "weight": 1
     },
     {
       "children": [
         {
           "children": [],
+          "crossed_points": null,
+          "goal": -1,
           "items": [
             {
               "atLeast": 1,
@@ -357,10 +469,16 @@
             }
           ],
           "name": "cp_a",
-          "type": 16384
+          "source_file": null,
+          "source_line": 0,
+          "source_token": 0,
+          "type": 16384,
+          "weight": 1
         },
         {
           "children": [],
+          "crossed_points": null,
+          "goal": -1,
           "items": [
             {
               "atLeast": 1,
@@ -376,10 +494,19 @@
             }
           ],
           "name": "cp_b",
-          "type": 16384
+          "source_file": null,
+          "source_line": 0,
+          "source_token": 0,
+          "type": 16384,
+          "weight": 1
         },
         {
           "children": [],
+          "crossed_points": [
+            "cp_a",
+            "cp_b"
+          ],
+          "goal": -1,
           "items": [
             {
               "atLeast": 1,
@@ -389,12 +516,22 @@
             }
           ],
           "name": "x_ab",
-          "type": 32768
+          "source_file": null,
+          "source_line": 0,
+          "source_token": 0,
+          "type": 32768,
+          "weight": 1
         }
       ],
+      "crossed_points": null,
+      "goal": -1,
       "items": [],
       "name": "cg_cross",
-      "type": 4096
+      "source_file": null,
+      "source_line": 0,
+      "source_token": 0,
+      "type": 4096,
+      "weight": 1
     },
     {
       "children": [
@@ -406,6 +543,8 @@
                   "children": [
                     {
                       "children": [],
+                      "crossed_points": null,
+                      "goal": -1,
                       "items": [
                         {
                           "atLeast": 1,
@@ -415,27 +554,55 @@
                         }
                       ],
                       "name": "level_4",
-                      "type": 16384
+                      "source_file": null,
+                      "source_line": 0,
+                      "source_token": 0,
+                      "type": 16384,
+                      "weight": 1
                     }
                   ],
+                  "crossed_points": null,
+                  "goal": -1,
                   "items": [],
                   "name": "level_3",
-                  "type": 16384
+                  "source_file": null,
+                  "source_line": 0,
+                  "source_token": 0,
+                  "type": 16384,
+                  "weight": 1
                 }
               ],
+              "crossed_points": null,
+              "goal": -1,
               "items": [],
               "name": "level_2",
-              "type": 16384
+              "source_file": null,
+              "source_line": 0,
+              "source_token": 0,
+              "type": 16384,
+              "weight": 1
             }
           ],
+          "crossed_points": null,
+          "goal": -1,
           "items": [],
           "name": "level_1",
-          "type": 16384
+          "source_file": null,
+          "source_line": 0,
+          "source_token": 0,
+          "type": 16384,
+          "weight": 1
         }
       ],
+      "crossed_points": null,
+      "goal": -1,
       "items": [],
       "name": "level_0",
-      "type": 4096
+      "source_file": null,
+      "source_line": 0,
+      "source_token": 0,
+      "type": 4096,
+      "weight": 1
     }
   ]
 }

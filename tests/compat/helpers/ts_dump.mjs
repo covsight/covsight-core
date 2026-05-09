@@ -12,7 +12,9 @@ import { MemUCIS } from '../../../ts/dist/mem/index.js';
 import { CoverTypeT } from '../../../ts/dist/api/enums/CoverTypeT.js';
 import { ScopeTypeT } from '../../../ts/dist/api/enums/ScopeTypeT.js';
 import { HistoryNodeKind } from '../../../ts/dist/api/enums/HistoryNodeKind.js';
+import { IntProperty } from '../../../ts/dist/api/enums/IntProperty.js';
 import { SourceInfo } from '../../../ts/dist/api/SourceInfo.js';
+import { TestData } from '../../../ts/dist/api/TestData.js';
 
 // ---------------------------------------------------------------------------
 // READ: load a .cdb and emit canonical JSON
@@ -32,11 +34,27 @@ function scopeToJson(scope) {
       name: item.name,
     });
   }
+  const srcFile  = scope.fileHandle?.filePath ?? null;
+  const srcLine  = scope.sourceInfo?.line  ?? 0;
+  const srcToken = scope.sourceInfo?.token ?? 0;
+  let crossedPoints = null;
+  if (scope.scopeType === ScopeTypeT.CROSS && typeof scope.getCrossedPoints === 'function') {
+    const pts = scope.getCrossedPoints();
+    if (pts && pts.length > 0) {
+      crossedPoints = pts.map(cp => cp.logicalName);
+    }
+  }
   return {
     children,
+    goal: scope.getIntProperty(IntProperty.SCOPE_GOAL),
     items,
     name: scope.logicalName,
+    source_file:  srcFile,
+    source_line:  srcLine,
+    source_token: srcToken,
     type: Number(scope.scopeType),
+    weight: scope.getIntProperty(IntProperty.SCOPE_WEIGHT),
+    crossed_points: crossedPoints,
   };
 }
 
@@ -54,8 +72,12 @@ async function cmdRead(filePath) {
   for (let i = 0; i < db.numHistoryNodes(); i++) {
     const node = db.historyNode(i);
     history.push({
-      kind: kindNames[node.kind] ?? String(node.kind),
-      name: node.testName,
+      kind:          kindNames[node.kind] ?? String(node.kind),
+      name:          node.testName,
+      user_name:     node.testData?.userName     ?? null,
+      seed:          node.testData?.seed         ?? null,
+      tool_category: node.testData?.toolCategory ?? null,
+      comment:       node.testData?.comment      ?? null,
     });
   }
 
@@ -123,8 +145,10 @@ const scenarios = {
     const cg = db.createCovergroupDef('cg_h');
     const cp = cg.createCoverpoint('cp0');
     cp.createBin('b0', CoverTypeT.CVGBIN, 1n, 1n);
-    db.createHistoryNode(HistoryNodeKind.TEST, 'smoke');
-    db.createHistoryNode(HistoryNodeKind.TEST, 'regression');
+    const h1 = db.createHistoryNode(HistoryNodeKind.TEST, 'smoke');
+    h1.testData = new TestData({ userName: 'alice', seed: '42', toolCategory: 'sim', comment: 'smoke run' });
+    const h2 = db.createHistoryNode(HistoryNodeKind.TEST, 'regression');
+    h2.testData = new TestData({ userName: 'bob', seed: '99', toolCategory: 'sim', comment: 'full regression' });
   },
 
   cross: async (db) => {
@@ -156,6 +180,25 @@ const scenarios = {
     await scenarios.history(db);
     await scenarios.cross(db);
     await scenarios.deep(db);
+  },
+
+  unicode_names: async (db) => {
+    const cg = db.createCovergroupDef('cg_αβγ');
+    const cp = cg.createCoverpoint('cp_café');
+    cp.createBin('bin_日本語', CoverTypeT.CVGBIN, 3n, 1n);
+  },
+
+  large_count: async (db) => {
+    const cg = db.createCovergroupDef('cg_large');
+    const cp = cg.createCoverpoint('cp0');
+    cp.createBin('big_bin', CoverTypeT.CVGBIN, 4294967296n, 1n);
+  },
+  weight_goal: async (db) => {
+    const cg = db.createCovergroupDef('cg_wg');
+    cg.setIntProperty(IntProperty.SCOPE_WEIGHT, 2);
+    cg.setIntProperty(IntProperty.SCOPE_GOAL, 80);
+    const cp = cg.createCoverpoint('cp0');
+    cp.createBin('b0', CoverTypeT.CVGBIN, 1n, 1n);
   },
 };
 

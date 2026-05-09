@@ -1,23 +1,6 @@
 {
   "format": "ncdb-dump-v1",
-  "history": [
-    {
-      "comment": "smoke run",
-      "kind": "TEST",
-      "name": "smoke",
-      "seed": "42",
-      "tool_category": "sim",
-      "user_name": "alice"
-    },
-    {
-      "comment": "full regression",
-      "kind": "TEST",
-      "name": "regression",
-      "seed": "99",
-      "tool_category": "sim",
-      "user_name": "bob"
-    }
-  ],
+  "history": [],
   "scopes": [
     {
       "children": [
@@ -42,14 +25,14 @@
         }
       ],
       "crossed_points": null,
-      "goal": -1,
+      "goal": 80,
       "items": [],
-      "name": "cg_h",
+      "name": "cg_wg",
       "source_file": null,
       "source_line": 0,
       "source_token": 0,
       "type": 4096,
-      "weight": 1
+      "weight": 2
     }
   ]
 }

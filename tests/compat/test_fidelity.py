@@ -16,7 +16,6 @@ from conftest import Helpers, SCENARIO_FNS
 
 
 WRITERS = ["python", "typescript", "c"]
-WRITERS_NO_SOURCE = ["python", "typescript"]  # C lacks source_info write
 
 
 def _first_scope(doc, name=None):
@@ -291,10 +290,10 @@ def test_cross_coverpoint_bins(writer, helpers: Helpers, tmp_path):
 
 
 # ---------------------------------------------------------------------------
-# source_info scenario (Python + TS only)
+# source_info scenario (all writers now support source info)
 # ---------------------------------------------------------------------------
 
-@pytest.mark.parametrize("writer", WRITERS_NO_SOURCE)
+@pytest.mark.parametrize("writer", WRITERS)
 def test_source_info_scope_exists(writer, helpers: Helpers, tmp_path):
     """source_info scenario: cg_src scope is present."""
     cdb = tmp_path / "fid.cdb"
@@ -305,7 +304,7 @@ def test_source_info_scope_exists(writer, helpers: Helpers, tmp_path):
     assert cg is not None, f"{writer}: cg_src scope not found"
 
 
-@pytest.mark.parametrize("writer", WRITERS_NO_SOURCE)
+@pytest.mark.parametrize("writer", WRITERS)
 def test_source_info_bin_present(writer, helpers: Helpers, tmp_path):
     """source_info scenario: b0 bin is present with count=1."""
     cdb = tmp_path / "fid.cdb"
@@ -317,6 +316,26 @@ def test_source_info_bin_present(writer, helpers: Helpers, tmp_path):
     item = next((i for i in cp["items"] if i["name"] == "b0"), None)
     assert item is not None, f"{writer}: b0 bin not found"
     assert item["count"] == 1, f"{writer}: expected count=1"
+
+
+@pytest.mark.parametrize("writer", WRITERS)
+def test_source_info_preserved(writer, helpers: Helpers, tmp_path):
+    """Source file, line, and token survive a round-trip through every writer."""
+    cdb = tmp_path / "si.cdb"
+    helpers.write(writer, "source_info", cdb)
+    doc = helpers.read_python(cdb)
+
+    cg = _find_scope(doc, "cg_src")
+    assert cg is not None, f"{writer}: cg_src not found"
+    assert cg["source_file"]  == "rtl/foo.sv", f"{writer}: cg_src source_file wrong"
+    assert cg["source_line"]  == 10, f"{writer}: cg_src source_line wrong"
+    assert cg["source_token"] == 0,  f"{writer}: cg_src source_token wrong"
+
+    cp = _find_scope(doc, "cp0")
+    assert cp is not None, f"{writer}: cp0 not found"
+    assert cp["source_file"]  == "rtl/foo.sv", f"{writer}: cp0 source_file wrong"
+    assert cp["source_line"]  == 11, f"{writer}: cp0 source_line wrong"
+    assert cp["source_token"] == 5,  f"{writer}: cp0 source_token wrong"
 
 
 # ---------------------------------------------------------------------------
@@ -345,6 +364,50 @@ def test_deep_nesting(writer, helpers: Helpers, tmp_path):
 
 
 # ---------------------------------------------------------------------------
+# history scenario — cross-reader kind round-trip (item 4)
+# ---------------------------------------------------------------------------
+
+READER_NAMES = ["python", "typescript", "c"]
+
+
+@pytest.mark.parametrize("writer", WRITERS)
+@pytest.mark.parametrize("reader", READER_NAMES)
+def test_history_kind_round_trip(writer, reader, helpers: Helpers, tmp_path):
+    """History kind='TEST' is preserved across every writer × reader combination."""
+    cdb = tmp_path / "hist.cdb"
+    helpers.write(writer, "history", cdb)
+    doc = helpers.read(reader, cdb)
+
+    assert len(doc["history"]) == 2, (
+        f"{writer}→{reader}: expected 2 history nodes, got {len(doc['history'])}")
+    for node in doc["history"]:
+        assert node["kind"] == "TEST", (
+            f"{writer}→{reader}: expected kind=TEST, got {node['kind']}")
+
+
+@pytest.mark.parametrize("writer", WRITERS)
+@pytest.mark.parametrize("reader", READER_NAMES)
+def test_history_testdata_fields(writer, reader, helpers: Helpers, tmp_path):
+    """History TestData fields (user_name, seed, tool_category, comment) are preserved
+    across every writer × reader combination."""
+    cdb = tmp_path / "hist_td.cdb"
+    helpers.write(writer, "history", cdb)
+    doc = helpers.read(reader, cdb)
+
+    nodes_by_name = {n["name"]: n for n in doc["history"]}
+    smoke = nodes_by_name.get("smoke", {})
+    assert smoke.get("user_name") == "alice",       f"{writer}→{reader}: smoke user_name wrong: {smoke}"
+    assert smoke.get("seed") == "42",               f"{writer}→{reader}: smoke seed wrong: {smoke}"
+    assert smoke.get("tool_category") == "sim",     f"{writer}→{reader}: smoke tool_category wrong: {smoke}"
+    assert smoke.get("comment") == "smoke run",     f"{writer}→{reader}: smoke comment wrong: {smoke}"
+
+    regression = nodes_by_name.get("regression", {})
+    assert regression.get("user_name") == "bob",       f"{writer}→{reader}: regression user_name wrong: {regression}"
+    assert regression.get("seed") == "99",             f"{writer}→{reader}: regression seed wrong: {regression}"
+    assert regression.get("comment") == "full regression", f"{writer}→{reader}: regression comment wrong: {regression}"
+
+
+# ---------------------------------------------------------------------------
 # scope type values
 # ---------------------------------------------------------------------------
 
@@ -368,3 +431,48 @@ def test_scope_type_values(writer, helpers: Helpers, tmp_path):
     assert types.get("cg_cross") == 4096,  f"{writer}: COVERGROUP != 4096"
     assert types.get("cp_a")     == 16384, f"{writer}: COVERPOINT != 16384"
     assert types.get("x_ab")     == 32768, f"{writer}: CROSS != 32768"
+
+
+# ---------------------------------------------------------------------------
+# weight / goal
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize("writer", WRITERS)
+def test_weight_goal_preserved(writer, helpers: Helpers, tmp_path):
+    """Weight and goal values survive a round-trip through every writer."""
+    cdb = tmp_path / "wg.cdb"
+    helpers.write(writer, "weight_goal", cdb)
+    doc = helpers.read_python(cdb)
+
+    cg = next((s for s in doc["scopes"] if s["name"] == "cg_wg"), None)
+    assert cg is not None, f"{writer}: cg_wg not found in scopes"
+    assert cg["weight"] == 2,  f"{writer}: expected weight=2, got {cg['weight']}"
+    assert cg["goal"]   == 80, f"{writer}: expected goal=80, got {cg['goal']}"
+
+
+# ---------------------------------------------------------------------------
+# cross crossed_points references
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize("writer", WRITERS)
+@pytest.mark.parametrize("reader", READER_NAMES)
+def test_cross_crossed_points_resolved(writer, reader, helpers: Helpers, tmp_path):
+    """crossed_points are preserved (x_ab references cp_a and cp_b) for all writer/reader combos."""
+    cdb = tmp_path / "cross_cp.cdb"
+    helpers.write(writer, "cross", cdb)
+    doc = helpers.read(reader, cdb)
+
+    def find_scope(scopes, name):
+        for s in scopes:
+            if s["name"] == name:
+                return s
+            found = find_scope(s.get("children", []), name)
+            if found is not None:
+                return found
+        return None
+
+    x_ab = find_scope(doc["scopes"], "x_ab")
+    assert x_ab is not None, f"{writer}→{reader}: x_ab scope not found"
+    cp = x_ab.get("crossed_points")
+    assert cp is not None, f"{writer}→{reader}: x_ab has no crossed_points"
+    assert cp == ["cp_a", "cp_b"], f"{writer}→{reader}: crossed_points={cp!r}"

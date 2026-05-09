@@ -2,6 +2,7 @@
 #include <stdarg.h>
 
 #include "ncdb_impl.h"
+#include "ncdb_cross.h"
 
 static void free_scope(ncdbScopeT scope) {
     size_t i;
@@ -15,6 +16,7 @@ static void free_scope(ncdbScopeT scope) {
     }
     free(scope->covers);
     free(scope->children);
+    free(scope->crossed_points);  /* array only — pointed-to scopes are owned elsewhere */
     free(scope->name);
     free(scope->source_path);
     free(scope);
@@ -89,9 +91,14 @@ void ncdb_impl_reset_db(ncdbT db) {
     if (!db) return;
     for (i = 0; i < db->root_count; i++) free_scope(db->roots[i]);
     for (i = 0; i < db->history_count; i++) {
-        free(db->history_nodes[i]->logical_name);
-        free(db->history_nodes[i]->physical_name);
-        free(db->history_nodes[i]);
+        ncdbHistoryNodeT n = db->history_nodes[i];
+        free(n->logical_name);
+        free(n->physical_name);
+        free(n->user_name); free(n->seed); free(n->tool_category); free(n->comment);
+        free(n->date); free(n->run_cwd); free(n->cmd); free(n->args);
+        free(n->time_unit); free(n->vendor_id); free(n->vendor_tool);
+        free(n->vendor_tool_version); free(n->same_tests);
+        free(n);
     }
     for (i = 0; i < db->source_count; i++) free(db->sources[i]);
     free(db->roots); db->roots = NULL; db->root_count = db->root_cap = 0;
@@ -152,6 +159,11 @@ ncdbHistoryNodeT ncdb_impl_create_history(ncdbT db, uint32_t kind, const char *l
     h->logical_name = ncdb_impl_strdup(logical_name ? logical_name : "");
     h->physical_name = ncdb_impl_strdup(physical_name);
     if (!h->logical_name) { free(h->physical_name); free(h); return NULL; }
+    h->test_status = 0;  /* OK */
+    h->compulsory  = 0;
+    h->sim_time    = -1.0;
+    h->cpu_time    = -1.0;
+    h->cost        = -1.0;
     if (append_ptr((void ***)&db->history_nodes, &db->history_count, &db->history_cap, h) != 0) {
         free(h->logical_name); free(h->physical_name); free(h); return NULL;
     }
@@ -291,19 +303,20 @@ done:
 
 int ncdb_Write(ncdbT db, const char *path) {
     ncdbStringTable strings;
-    ncdbBuf tree_b, counts_tmp, counts_b, strings_b, manifest_b, history_b, sources_b, attrs_b;
+    ncdbBuf tree_b, counts_tmp, counts_b, strings_b, manifest_b, history_b, sources_b, attrs_b, cross_b;
     ncdbManifest manifest;
-    ncdbZipMember members[7];
+    ncdbZipMember members[8];
     size_t member_count = 0;
     uint64_t *counts = NULL;
     size_t count_count = 0;
     char err[256] = {0};
     int rc = -1;
+    int cross_rc;
 
     ncdb_strings_init(&strings);
     ncdb_impl_buf_init(&tree_b); ncdb_impl_buf_init(&counts_tmp); ncdb_impl_buf_init(&counts_b);
     ncdb_impl_buf_init(&strings_b); ncdb_impl_buf_init(&manifest_b); ncdb_impl_buf_init(&history_b);
-    ncdb_impl_buf_init(&sources_b); ncdb_impl_buf_init(&attrs_b);
+    ncdb_impl_buf_init(&sources_b); ncdb_impl_buf_init(&attrs_b); ncdb_impl_buf_init(&cross_b);
     ncdb_manifest_init(&manifest);
 
     if (ncdb_strings_add(&strings, "") < 0 ||
@@ -313,7 +326,9 @@ int ncdb_Write(ncdbT db, const char *path) {
     }
     counts = (uint64_t *)counts_tmp.data;
     count_count = counts_tmp.size / sizeof(uint64_t);
-    if (ncdb_counts_serialize(counts, count_count, &counts_b) != 0 ||
+    cross_rc = ncdb_cross_serialize(db, &cross_b);
+    if (cross_rc < 0 ||
+        ncdb_counts_serialize(counts, count_count, &counts_b) != 0 ||
         ncdb_strings_serialize(&strings, &strings_b) != 0 ||
         ncdb_history_serialize(db, &history_b) != 0 ||
         ncdb_sources_serialize(db, &sources_b) != 0 ||
@@ -330,6 +345,8 @@ int ncdb_Write(ncdbT db, const char *path) {
     members[member_count++] = (ncdbZipMember){NCDB_MEMBER_HISTORY, history_b.data, history_b.size, 0};
     members[member_count++] = (ncdbZipMember){NCDB_MEMBER_SOURCES, sources_b.data, sources_b.size, 0};
     members[member_count++] = (ncdbZipMember){NCDB_MEMBER_ATTRS, attrs_b.data, attrs_b.size, 0};
+    if (cross_rc > 0)  /* cross.bin present */
+        members[member_count++] = (ncdbZipMember){NCDB_MEMBER_CROSS, cross_b.data, cross_b.size, 0};
     if (ncdb_zip_write_archive(path, members, member_count, err, sizeof(err)) != 0) {
         ncdb_impl_set_error(db, "%s", err); goto done;
     }
@@ -347,6 +364,7 @@ done:
     ncdb_impl_buf_free(&history_b);
     ncdb_impl_buf_free(&sources_b);
     ncdb_impl_buf_free(&attrs_b);
+    ncdb_impl_buf_free(&cross_b);
     return rc;
 }
 
@@ -368,6 +386,27 @@ int ncdb_ScopeIterate(ncdbT db, ncdbScopeT parent, uint32_t type_mask, int (*cb)
 const char *ncdb_GetScopeName(ncdbT db, ncdbScopeT scope) { (void)db; return scope ? scope->name : NULL; }
 uint32_t ncdb_GetScopeType(ncdbT db, ncdbScopeT scope) { (void)db; return scope ? (uint32_t)scope->type : 0; }
 ncdbScopeT ncdb_GetParent(ncdbT db, ncdbScopeT scope) { (void)db; return scope ? scope->parent : NULL; }
+uint64_t ncdb_GetScopeWeight(ncdbT db, ncdbScopeT scope) { (void)db; return scope ? scope->weight : 1; }
+int64_t ncdb_GetScopeGoal(ncdbT db, ncdbScopeT scope) { (void)db; return scope ? scope->goal : -1; }
+void ncdb_SetScopeWeight(ncdbT db, ncdbScopeT scope, uint64_t weight) { (void)db; if (scope) scope->weight = weight; }
+void ncdb_SetScopeGoal(ncdbT db, ncdbScopeT scope, int64_t goal) { (void)db; if (scope) scope->goal = goal; }
+
+const char *ncdb_GetScopeSourcePath(ncdbT db, ncdbScopeT scope) { (void)db; return scope ? scope->source_path : NULL; }
+uint64_t ncdb_GetScopeSourceLine(ncdbT db, ncdbScopeT scope) { (void)db; return scope ? scope->source_line : 0; }
+uint64_t ncdb_GetScopeSourceToken(ncdbT db, ncdbScopeT scope) { (void)db; return scope ? scope->source_token : 0; }
+
+int ncdb_SetScopeSourceInfo(ncdbT db, ncdbScopeT scope, const char *path, uint64_t line, uint64_t token) {
+    char *copy;
+    if (!scope || !path) return -1;
+    (void)db;
+    copy = ncdb_impl_strdup(path);
+    if (!copy) return -1;
+    free(scope->source_path);
+    scope->source_path = copy;
+    scope->source_line  = line;
+    scope->source_token = token;
+    return 0;
+}
 
 int ncdb_CoverIterate(ncdbT db, ncdbScopeT scope, int (*cb)(ncdbT, ncdbCoverT, void *), void *ud) {
     size_t i;
@@ -397,4 +436,30 @@ int ncdb_HistoryIterate(ncdbT db, uint32_t kind_mask, int (*cb)(ncdbT, ncdbHisto
 }
 
 const char *ncdb_GetHistoryLogicalName(ncdbT db, ncdbHistoryNodeT node) { (void)db; return node ? node->logical_name : NULL; }
+const char *ncdb_GetHistoryPhysicalName(ncdbT db, ncdbHistoryNodeT node) { (void)db; return node ? node->physical_name : NULL; }
+uint32_t    ncdb_GetHistoryKind(ncdbT db, ncdbHistoryNodeT node)        { (void)db; return node ? node->kind : 0; }
+const char *ncdb_GetHistoryUserName(ncdbT db, ncdbHistoryNodeT node)    { (void)db; return node ? node->user_name : NULL; }
+const char *ncdb_GetHistorySeed(ncdbT db, ncdbHistoryNodeT node)        { (void)db; return node ? node->seed : NULL; }
+const char *ncdb_GetHistoryToolCategory(ncdbT db, ncdbHistoryNodeT node){ (void)db; return node ? node->tool_category : NULL; }
+const char *ncdb_GetHistoryComment(ncdbT db, ncdbHistoryNodeT node)     { (void)db; return node ? node->comment : NULL; }
+uint32_t    ncdb_GetHistoryTestStatus(ncdbT db, ncdbHistoryNodeT node)  { (void)db; return node ? node->test_status : 0; }
+
+static void ncdb_impl_set_history_str(char **field, const char *val) {
+    free(*field);
+    *field = ncdb_impl_strdup(val);
+}
+
+void ncdb_SetHistoryUserName(ncdbT db, ncdbHistoryNodeT node, const char *v)    { (void)db; if (node) ncdb_impl_set_history_str(&node->user_name, v); }
+void ncdb_SetHistorySeed(ncdbT db, ncdbHistoryNodeT node, const char *v)        { (void)db; if (node) ncdb_impl_set_history_str(&node->seed, v); }
+void ncdb_SetHistoryToolCategory(ncdbT db, ncdbHistoryNodeT node, const char *v){ (void)db; if (node) ncdb_impl_set_history_str(&node->tool_category, v); }
+void ncdb_SetHistoryComment(ncdbT db, ncdbHistoryNodeT node, const char *v)     { (void)db; if (node) ncdb_impl_set_history_str(&node->comment, v); }
+void ncdb_SetHistoryTestStatus(ncdbT db, ncdbHistoryNodeT node, uint32_t v)     { (void)db; if (node) node->test_status = v; }
+
+size_t     ncdb_GetCrossPointCount(ncdbT db, ncdbScopeT scope) { (void)db; return scope ? scope->crossed_count : 0; }
+ncdbScopeT ncdb_GetCrossPoint(ncdbT db, ncdbScopeT scope, size_t idx) { (void)db; return (scope && idx < scope->crossed_count) ? scope->crossed_points[idx] : NULL; }
+
+int ncdb_impl_add_cross_point(ncdbScopeT cross_scope, ncdbScopeT cp) {
+    return append_ptr((void ***)&cross_scope->crossed_points, &cross_scope->crossed_count, &cross_scope->crossed_cap, cp);
+}
+
 const char *ncdb_GetLastError(ncdbT db) { return (db && db->last_error) ? db->last_error : ""; }

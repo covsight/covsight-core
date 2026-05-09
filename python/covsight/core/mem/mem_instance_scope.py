@@ -36,6 +36,9 @@ class MemInstanceScope(MemScope,InstanceScope):
             ):
         MemScope.__init__(self, parent, name, srcinfo, weight, source, type, flags)
         InstanceScope.__init__(self)
+        # InstanceScope.__init__ → Scope.__init__ sets goal=100 as API default;
+        # reset to -1 meaning "not set in file" (matches MemScope convention).
+        self.m_goal = -1
             
         self.m_du_scope = du_scope
         self.m_cover_item_l = []

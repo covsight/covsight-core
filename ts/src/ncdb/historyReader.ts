@@ -6,6 +6,12 @@ interface HistoryRecord {
   kind?: string | number;
   test_name?: string | null;
   logical_name?: string | null;
+  /* flat fields (Python/C compatible) */
+  user_name?: string | null;
+  seed?: string | null;
+  tool_category?: string | null;
+  comment?: string | null;
+  /* nested test_data (TS internal format) */
   test_data?: Record<string, unknown> | null;
 }
 
@@ -14,25 +20,30 @@ export class HistoryReader {
     const records = JSON.parse(json) as HistoryRecord[];
     for (const record of records) {
       const node = db.createHistoryNode(parseKind(record.kind), record.logical_name ?? record.test_name ?? '');
-      if (record.test_data) {
-        const raw = record.test_data;
+      const raw = record.test_data;
+      /* Read testdata fields: prefer flat (Python/C) format, fall back to nested test_data */
+      const userName     = toString(record.user_name)     || (raw ? toString(raw.userName)     : '');
+      const seed         = toString(record.seed)          || (raw ? toString(raw.seed)         : '');
+      const toolCategory = toString(record.tool_category) || (raw ? toString(raw.toolCategory) : '');
+      const comment      = toString(record.comment)       || (raw ? toString(raw.comment)      : '');
+      if (raw || record.user_name != null || record.seed != null || record.tool_category != null || record.comment != null) {
         node.testData = new TestData({
-          userName: toString(raw.userName),
-          testPlanName: toString(raw.testPlanName),
-          date: toString(raw.date),
-          simElapsed: toString(raw.simElapsed),
-          runCwd: toString(raw.runCwd),
-          comment: toString(raw.comment),
-          userName2: toString(raw.userName2),
-          toolCategory: toString(raw.toolCategory),
-          compulsory: Boolean(raw.compulsory),
-          date2: toString(raw.date2),
-          simCmd: toString(raw.simCmd),
-          elaborCmd: toString(raw.elaborCmd),
-          seed: toString(raw.seed),
-          goldenLog: toString(raw.goldenLog),
-          randstate: toString(raw.randstate),
-          attributes: new Map<string, string>(Object.entries((raw.attributes ?? {}) as Record<string, string>)),
+          userName,
+          testPlanName: raw ? toString(raw.testPlanName) : '',
+          date:         raw ? toString(raw.date)         : '',
+          simElapsed:   raw ? toString(raw.simElapsed)   : '',
+          runCwd:       raw ? toString(raw.runCwd)       : '',
+          comment,
+          userName2:    raw ? toString(raw.userName2)    : '',
+          toolCategory,
+          compulsory:   raw ? Boolean(raw.compulsory)    : false,
+          date2:        raw ? toString(raw.date2)        : '',
+          simCmd:       raw ? toString(raw.simCmd)       : '',
+          elaborCmd:    raw ? toString(raw.elaborCmd)    : '',
+          seed,
+          goldenLog:    raw ? toString(raw.goldenLog)    : '',
+          randstate:    raw ? toString(raw.randstate)    : '',
+          attributes: new Map<string, string>(Object.entries((raw?.attributes ?? {}) as Record<string, string>)),
         });
       }
     }

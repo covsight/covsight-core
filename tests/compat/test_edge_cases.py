@@ -234,3 +234,46 @@ def test_full_all_readers_agree(writer, helpers: Helpers, tmp_path):
     assert c_got == ref, (
         f"{writer}: C ≠ Python for full scenario\n"
         f"{json.dumps(ref, indent=2)[:500]}")
+
+
+# ---------------------------------------------------------------------------
+# Unicode scope/item names (item 6)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize("writer", WRITERS)
+def test_unicode_scope_names(writer, helpers: Helpers, tmp_path):
+    """Unicode (multi-byte UTF-8) scope and item names survive write → read."""
+    cdb = tmp_path / "uni.cdb"
+    helpers.write(writer, "unicode_names", cdb)
+    doc = helpers.read_python(cdb)
+
+    cg = next((s for s in doc["scopes"] if s["name"] == "cg_αβγ"), None)
+    assert cg is not None, f"{writer}: cg_αβγ not found in scopes"
+
+    cp = next((c for c in cg["children"] if c["name"] == "cp_café"), None)
+    assert cp is not None, f"{writer}: cp_café not found under cg_αβγ"
+
+    item = next((i for i in cp["items"] if i["name"] == "bin_日本語"), None)
+    assert item is not None, f"{writer}: bin_日本語 not found"
+    assert item["count"] == 3, f"{writer}: expected count=3, got {item['count']}"
+
+
+# ---------------------------------------------------------------------------
+# Large count values > 2^32 (item 7)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize("writer", WRITERS)
+def test_count_above_2_32(writer, helpers: Helpers, tmp_path):
+    """Count value 2^32 (4294967296) survives write → read in all impls."""
+    cdb = tmp_path / "large.cdb"
+    helpers.write(writer, "large_count", cdb)
+    doc = helpers.read_python(cdb)
+
+    cg = next((s for s in doc["scopes"] if s["name"] == "cg_large"), None)
+    assert cg is not None, f"{writer}: cg_large not found"
+    cp = next((c for c in cg["children"] if c["name"] == "cp0"), None)
+    assert cp is not None, f"{writer}: cp0 not found under cg_large"
+    item = next((i for i in cp["items"] if i["name"] == "big_bin"), None)
+    assert item is not None, f"{writer}: big_bin not found"
+    assert item["count"] == 2**32, (
+        f"{writer}: expected count={2**32}, got {item['count']}")

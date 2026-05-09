@@ -6,6 +6,8 @@
       "children": [
         {
           "children": [],
+          "crossed_points": null,
+          "goal": -1,
           "items": [
             {
               "atLeast": 2,
@@ -21,12 +23,22 @@
             }
           ],
           "name": "cp0",
-          "type": 16384
+          "source_file": null,
+          "source_line": 0,
+          "source_token": 0,
+          "type": 16384,
+          "weight": 1
         }
       ],
+      "crossed_points": null,
+      "goal": -1,
       "items": [],
       "name": "cg_al",
-      "type": 4096
+      "source_file": null,
+      "source_line": 0,
+      "source_token": 0,
+      "type": 4096,
+      "weight": 1
     }
   ]
 }

@@ -4,14 +4,22 @@
   "scopes": [
     {
       "children": [],
+      "crossed_points": null,
+      "goal": -1,
       "items": [],
       "name": "top",
-      "type": 16777216
+      "source_file": null,
+      "source_line": 0,
+      "source_token": 0,
+      "type": 16777216,
+      "weight": 1
     },
     {
       "children": [
         {
           "children": [],
+          "crossed_points": null,
+          "goal": -1,
           "items": [
             {
               "atLeast": 0,
@@ -27,12 +35,22 @@
             }
           ],
           "name": "sig_valid",
-          "type": 2
+          "source_file": null,
+          "source_line": 0,
+          "source_token": 0,
+          "type": 2,
+          "weight": 1
         }
       ],
+      "crossed_points": null,
+      "goal": -1,
       "items": [],
       "name": "top",
-      "type": 16
+      "source_file": null,
+      "source_line": 0,
+      "source_token": 0,
+      "type": 16,
+      "weight": 1
     }
   ]
 }
