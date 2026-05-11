@@ -2,7 +2,7 @@ package:
   name: covsight-core
 
   dep-sets:
-  - name: default
+  - name: default-dev
     deps:
     - name: minizip-ng
       url: https://github.com/zlib-ng/minizip-ng/archive/refs/tags/4.2.1.tar.gz
