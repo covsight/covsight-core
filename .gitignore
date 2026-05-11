@@ -10,3 +10,5 @@ build/
 *.cdb
 packages/
 node_modules/
+
+_build/
