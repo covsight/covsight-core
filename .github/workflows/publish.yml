@@ -1,0 +1,89 @@
+name: Publish
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  test-python:
+    name: Python tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install
+        run: pip install -e ".[dev]"
+      - name: Test
+        run: pytest
+
+  test-typescript:
+    name: TypeScript tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: ts/package-lock.json
+      - name: Install
+        run: cd ts && npm ci
+      - name: Lint
+        run: cd ts && npm run lint
+      - name: Build
+        run: cd ts && npm run build
+      - name: Test
+        run: cd ts && npm test
+
+  publish-pypi:
+    name: Publish to PyPI
+    needs: [test-python, test-typescript]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Build
+        run: |
+          pip install build twine
+          python -m build
+          twine check dist/*
+      - name: Publish
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          password: ${{ secrets.PYPI_API_TOKEN }}
+
+  publish-npm:
+    name: Publish to NPM
+    needs: [test-python, test-typescript]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          registry-url: https://registry.npmjs.org
+          cache: npm
+          cache-dependency-path: ts/package-lock.json
+      - name: Install
+        run: cd ts && npm ci
+      - name: Set version
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          cd ts && npm pkg set version="$VERSION"
+      - name: Build
+        run: cd ts && npm run build
+      - name: Dry run
+        run: cd ts && npm pack --dry-run
+      - name: Publish
+        run: cd ts && npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

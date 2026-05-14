@@ -7,10 +7,19 @@ name = "covsight-core"
 dynamic = ["version"]
 requires-python = ">=3.10"
 description = "Core UCIS data-model API and NCDB format for coverage data"
+readme = "README.md"
 license = "Apache-2.0"
+authors = [
+  { name = "CovSight Contributors" },
+]
 dependencies = []
 # NOTE: covsight-core has ZERO runtime dependencies.
 # The NCDB C accelerator is optional and built via cffi at install time.
+
+[project.urls]
+Homepage = "https://github.com/covsight/covsight-core"
+Repository = "https://github.com/covsight/covsight-core"
+Issues = "https://github.com/covsight/covsight-core/issues"
 
 [project.optional-dependencies]
 accel = ["cffi>=1.15"]

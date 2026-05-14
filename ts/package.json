@@ -1,6 +1,19 @@
 {
   "name": "@covsight/core",
   "version": "0.1.0",
+  "description": "Core UCIS data-model API and NCDB format for coverage data",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/covsight/covsight-core.git",
+    "directory": "ts"
+  },
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
