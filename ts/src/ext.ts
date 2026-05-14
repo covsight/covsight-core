@@ -18,7 +18,9 @@ export class FormatRegistry {
           throw new TypeError('Format registry is read-only');
         };
       }
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const value = Reflect.get(target, prop, target);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       return typeof value === 'function' ? value.bind(target) : value;
     },
   }) as ReadonlyMap<string, DbFormat>;

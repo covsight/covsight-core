@@ -46,6 +46,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Fetch C dependencies
+        run: |
+          mkdir -p packages
+          curl -L https://github.com/zlib-ng/minizip-ng/archive/refs/tags/4.2.1.tar.gz \
+            | tar -xz -C packages --one-top-level=minizip-ng --strip-components=1
+          curl -L https://github.com/DaveGamble/cJSON/archive/refs/tags/v1.7.19.tar.gz \
+            | tar -xz -C packages --one-top-level=cjson --strip-components=1
       - name: Build
         run: cmake -S c -B c/build && cmake --build c/build
       - name: Test

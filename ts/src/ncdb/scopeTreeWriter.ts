@@ -1,4 +1,3 @@
-import type { CoverItem } from '../api/CoverItem.js';
 import type { Scope } from '../api/Scope.js';
 import { ScopeTypeT } from '../api/enums/ScopeTypeT.js';
 import type { MemUCIS } from '../mem/MemUCIS.js';
