@@ -1,6 +1,8 @@
 {
+  "coverage_links": [],
   "format": "ncdb-dump-v1",
   "history": [],
+  "issues": [],
   "scopes": [
     {
       "children": [
@@ -87,5 +89,7 @@
       "type": 4096,
       "weight": 1
     }
-  ]
+  ],
+  "testpoint_links": [],
+  "waiver_links": []
 }

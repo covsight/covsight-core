@@ -92,6 +92,18 @@ class NcdbUCIS(MemUCIS):
         self._waivers = None           # Optional[WaiverSet]
         self._waivers_dirty: bool = False
 
+        # Issues lazy state
+        self._loaded_issues: bool = False
+        self._issues = None                          # Optional[IssueSet]
+        self._issues_dirty: bool = False
+        self._issues_meta: Optional[object] = None  # Optional[IssuesMeta]
+        self._issues_meta_dirty: bool = False
+        self._issues_meta_raw: bytes = b''
+        self._issues_history: Optional[object] = None  # Optional[IssueHistoryReader]
+        self._issues_history_raw: bytes = b''           # compressed bytes for writing
+        self._issues_history_dirty: bool = False
+        self._issues_history_pending: Optional[object] = None  # Optional[IssueHistoryWriter]
+
     # ── Public extra API ──────────────────────────────────────────────────
 
     @property
@@ -397,6 +409,89 @@ class NcdbUCIS(MemUCIS):
         if raw:
             from .waivers import WaiverSet
             self._waivers = WaiverSet.from_bytes(raw)
+
+    # ── Issues API ────────────────────────────────────────────────────────
+
+    def getIssues(self):
+        """Return the embedded issue set, or ``None`` if none is stored.
+
+        Returns:
+            :class:`~covsight.core.ncdb.issues.IssueSet` or ``None``.
+        """
+        self._ensure_issues()
+        return self._issues
+
+    def setIssues(self, issues) -> None:
+        """Embed *issues* in this database.
+
+        The issue set is written to ``issues.bin`` on the next write call.
+
+        Args:
+            issues: :class:`~covsight.core.ncdb.issues.IssueSet` instance.
+        """
+        self._issues = issues
+        self._issues_dirty = True
+        self._loaded_issues = True
+
+    def getIssuesMeta(self):
+        """Return the embedded issues metadata, or ``None`` if none is stored.
+
+        Parsed lazily from the raw JSON on first call.
+
+        Returns:
+            :class:`~covsight.core.ncdb.issues_meta.IssuesMeta` or ``None``.
+        """
+        if self._issues_meta is None and self._issues_meta_raw:
+            from .issues_meta import IssuesMeta
+            self._issues_meta = IssuesMeta.from_bytes(self._issues_meta_raw)
+            self._issues_meta_raw = b''
+        return self._issues_meta
+
+    def setIssuesMeta(self, meta) -> None:
+        """Embed *meta* in this database.
+
+        Args:
+            meta: :class:`~covsight.core.ncdb.issues_meta.IssuesMeta` instance.
+        """
+        self._issues_meta = meta
+        self._issues_meta_dirty = True
+
+    def getIssueHistory(self):
+        """Return the embedded issue history reader, or ``None`` if none is stored.
+
+        Returns:
+            :class:`~covsight.core.ncdb.issues_history.IssueHistoryReader` or ``None``.
+        """
+        return self._issues_history
+
+    def setIssueHistoryData(self, data: bytes) -> None:
+        """Replace the issue history with a compressed payload *data*.
+
+        Args:
+            data: Compressed ``issues_history.bin`` bytes.
+        """
+        from .issues_history import IssueHistoryReader
+        self._issues_history = IssueHistoryReader(data)
+        self._issues_history_raw = data
+        self._issues_history_dirty = True
+
+    def _ensure_issues(self) -> None:
+        """Lazy-load issues.bin from the ZIP cache."""
+        if self._loaded_issues:
+            return
+        self._loaded_issues = True
+        self._read_zip()
+        from .constants import MEMBER_ISSUES, MEMBER_ISSUES_META, MEMBER_ISSUES_HISTORY
+        raw = self._zf_cache.get(MEMBER_ISSUES)
+        if raw:
+            from .issues import IssueSet
+            self._issues = IssueSet.from_bytes(raw)
+        self._issues_meta_raw = self._zf_cache.get(MEMBER_ISSUES_META, b'')
+        hist_raw = self._zf_cache.get(MEMBER_ISSUES_HISTORY)
+        if hist_raw:
+            from .issues_history import IssueHistoryReader
+            self._issues_history = IssueHistoryReader(hist_raw)
+            self._issues_history_raw = hist_raw
 
     # ── MemUCIS overrides — trigger lazy loads ─────────────────────────
 

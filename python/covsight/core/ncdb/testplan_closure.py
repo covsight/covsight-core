@@ -7,12 +7,13 @@ stage-level gate conditions.
 """
 from __future__ import annotations
 
+import fnmatch
 import re
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Dict, List, Optional
 
-from .testplan import Testplan, Testpoint
+from .testplan import Testplan, Testpoint, iter_testpoints
 
 
 class TPStatus(Enum):
@@ -30,18 +31,84 @@ _STAGE_ORDER = {"V1": 0, "V2": 1, "V2S": 2, "V3": 3}
 
 
 @dataclass
+class CoverageResult:
+    """Coverage measurement for one :class:`~testplan.CoverageBinding`."""
+    binding_type:  str
+    path_pattern:  str
+    matched_paths: List[str]
+    coverage_pct:  Optional[float] = None  # None = not available from DB
+
+
+@dataclass
 class TestpointResult:
     """Closure result for one testpoint."""
-    testpoint:     Testpoint
-    status:        TPStatus
-    matched_tests: List[str]
-    pass_count:    int = 0
-    fail_count:    int = 0
+    testpoint:        Testpoint
+    status:           TPStatus
+    matched_tests:    List[str]
+    pass_count:       int = 0
+    fail_count:       int = 0
+    coverage_results: List[CoverageResult] = field(default_factory=list)
+
+
+def compute_coverage_binding(testpoint: Testpoint, db) -> List[CoverageResult]:
+    """Resolve coverage bindings for *testpoint* against *db*.
+
+    Performs glob path matching on bindings whose ``path`` contains ``*`` or
+    ``?``; otherwise does an exact lookup.  Coverage percentages are populated
+    when the DB exposes a ``getCoveragePercent(path)`` method; otherwise
+    ``coverage_pct`` is left as ``None``.
+
+    Args:
+        testpoint: The testpoint whose ``coverage`` list to resolve.
+        db:        Any UCIS database object.
+
+    Returns:
+        One :class:`CoverageResult` per binding (empty list when the testpoint
+        has no bindings).
+    """
+    if not testpoint.coverage:
+        return []
+
+    all_cov_paths: List[str] = []
+    if hasattr(db, 'coverageItems'):
+        try:
+            all_cov_paths = list(db.coverageItems())
+        except Exception:
+            pass
+
+    results: List[CoverageResult] = []
+    for binding in testpoint.coverage:
+        pattern = binding.path
+        is_glob = any(c in pattern for c in ('*', '?', '['))
+        if is_glob and all_cov_paths:
+            matched = [p for p in all_cov_paths if fnmatch.fnmatch(p, pattern)]
+        elif not is_glob:
+            matched = [pattern]
+        else:
+            matched = []
+
+        pct: Optional[float] = None
+        if matched and hasattr(db, 'getCoveragePercent'):
+            try:
+                pct = db.getCoveragePercent(matched[0])
+            except Exception:
+                pass
+
+        results.append(CoverageResult(
+            binding_type=binding.type,
+            path_pattern=pattern,
+            matched_paths=matched,
+            coverage_pct=pct,
+        ))
+    return results
 
 
 def compute_closure(testplan: Testplan, db,
                     waivers=None) -> List[TestpointResult]:
     """Compute pass/fail closure for every testpoint against *db*.
+
+    Uses :func:`~testplan.iter_testpoints` so testpoints nested inside
+    ``goals`` are included alongside top-level testpoints.
 
     Args:
         testplan: The testplan to evaluate.
@@ -87,7 +154,7 @@ def compute_closure(testplan: Testplan, db,
             pass
 
     results: List[TestpointResult] = []
-    for tp in testplan.testpoints:
+    for tp in iter_testpoints(testplan):
         if tp.na:
             results.append(TestpointResult(tp, TPStatus.NA, []))
             continue
@@ -130,7 +197,9 @@ def compute_closure(testplan: Testplan, db,
         else:
             status = TPStatus.PARTIAL
 
-        results.append(TestpointResult(tp, status, matched, passes, fails))
+        cov_results = compute_coverage_binding(tp, db)
+        results.append(TestpointResult(tp, status, matched, passes, fails,
+                                        coverage_results=cov_results))
 
     return results
 
@@ -139,7 +208,8 @@ def stage_gate_status(results: List[TestpointResult],
                       stage: str,
                       testplan: Testplan,
                       require_flake_score_below: Optional[float] = None,
-                      require_coverage_pct: Optional[float] = None) -> dict:
+                      require_coverage_pct: Optional[float] = None,
+                      require_goals_closed: bool = False) -> dict:
     """Determine whether the gate for *stage* is met.
 
     A stage gate passes when ALL testpoints at *stage* and all stages
@@ -151,6 +221,10 @@ def stage_gate_status(results: List[TestpointResult],
         testplan:                  The testplan (used for stage ordering).
         require_flake_score_below: Reserved — flakiness threshold (future).
         require_coverage_pct:      Reserved — coverage threshold (future).
+        require_goals_closed:      If ``True``, ALL testpoints (including those
+                                   nested inside goals) must be CLOSED or N/A.
+                                   When ``False`` (default) only top-level
+                                   testpoints at/below *stage* are checked.
 
     Returns:
         Dict with keys ``passed`` (bool), ``stage``, ``blocking``
@@ -163,12 +237,9 @@ def stage_gate_status(results: List[TestpointResult],
     stages_required = {s for s in testplan.stages()
                        if _STAGE_ORDER.get(s, 99) <= target_rank}
 
-    # Index results by testpoint name
-    result_map = {r.testpoint.name: r for r in results}
-
     blocking: List[TestpointResult] = []
     for r in results:
-        if r.testpoint.stage not in stages_required:
+        if not require_goals_closed and r.testpoint.stage not in stages_required:
             continue
         if r.status in (TPStatus.CLOSED, TPStatus.NA, TPStatus.UNIMPLEMENTED):
             continue
@@ -188,3 +259,4 @@ def stage_gate_status(results: List[TestpointResult],
         "blocking": blocking,
         "message":  message,
     }
+

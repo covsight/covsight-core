@@ -32,6 +32,7 @@ from .constants import (
     MEMBER_BUCKET_INDEX, MEMBER_CONTRIB_INDEX, MEMBER_SQUASH_LOG,
     HISTORY_BUCKET_DIR, HISTORY_FORMAT_V2,
     MEMBER_TESTPLAN, MEMBER_WAIVERS,
+    MEMBER_ISSUES, MEMBER_ISSUES_META, MEMBER_ISSUES_HISTORY,
 )
 
 from covsight.core.mem.mem_ucis import MemUCIS
@@ -232,6 +233,23 @@ class NcdbReader:
             from .waivers import WaiverSet
             db._waivers = WaiverSet.from_bytes(waivers_raw)
             db._loaded_waivers = True
+
+        # Issues (optional)
+        issues_raw = zf_data.get(MEMBER_ISSUES, b'')
+        if issues_raw:
+            from .issues import IssueSet
+            db._issues = IssueSet.from_bytes(issues_raw)
+            db._loaded_issues = True
+
+        # Issues meta — defer parse until first access
+        db._issues_meta_raw = zf_data.get(MEMBER_ISSUES_META, b'')
+
+        # Issues history (optional)
+        issues_hist_raw = zf_data.get(MEMBER_ISSUES_HISTORY, b'')
+        if issues_hist_raw:
+            from .issues_history import IssueHistoryReader
+            db._issues_history = IssueHistoryReader(issues_hist_raw)
+            db._issues_history_raw = issues_hist_raw
 
         return db
 

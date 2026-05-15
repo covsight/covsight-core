@@ -55,6 +55,40 @@ void ncdb_SetHistoryTestStatus(ncdbT db, ncdbHistoryNodeT node, uint32_t v);
 size_t       ncdb_GetCrossPointCount(ncdbT db, ncdbScopeT scope);
 ncdbScopeT   ncdb_GetCrossPoint(ncdbT db, ncdbScopeT scope, size_t idx);
 
+/* ── Issue iteration ────────────────────────────────────────────────────── */
+int ncdb_IssueIterate(ncdbT db,
+                      int (*cb)(ncdbT, ncdbIssueT, void *), void *ud);
+int ncdb_IssueIterateOpen(ncdbT db,
+                          int (*cb)(ncdbT, ncdbIssueT, void *), void *ud);
+int ncdb_IssueIterateBySeverity(ncdbT db, uint8_t severity,
+                                int (*cb)(ncdbT, ncdbIssueT, void *), void *ud);
+ncdbIssueT ncdb_GetIssueById(ncdbT db, const char *issue_id);
+
+/* ── Issue field accessors ──────────────────────────────────────────────── */
+const char *ncdb_GetIssueId(ncdbT db, ncdbIssueT issue);
+const char *ncdb_GetIssueExt(ncdbT db, ncdbIssueT issue);
+uint8_t     ncdb_GetIssueSeverity(ncdbT db, ncdbIssueT issue);
+uint8_t     ncdb_GetIssueKind(ncdbT db, ncdbIssueT issue);
+uint8_t     ncdb_GetIssueState(ncdbT db, ncdbIssueT issue);
+uint8_t     ncdb_GetIssueResolution(ncdbT db, ncdbIssueT issue);
+uint32_t    ncdb_GetIssueCreatedAt(ncdbT db, ncdbIssueT issue);
+uint32_t    ncdb_GetIssueUpdatedAt(ncdbT db, ncdbIssueT issue);
+uint32_t    ncdb_GetIssueSyncedAt(ncdbT db, ncdbIssueT issue);
+
+/* ── Link iteration ─────────────────────────────────────────────────────── */
+int ncdb_WaiverLinkIterate(ncdbT db,
+    int (*cb)(ncdbT, const char *, const char *, void *), void *ud);
+int ncdb_TestpointLinkIterate(ncdbT db,
+    int (*cb)(ncdbT, const char *, const char *, uint8_t, void *), void *ud);
+int ncdb_CoverageLinkIterate(ncdbT db,
+    int (*cb)(ncdbT, const char *, const char *, const char *, uint8_t, void *),
+    void *ud);
+
+/* ── Issue history ──────────────────────────────────────────────────────── */
+int ncdb_IssueHistoryIterate(ncdbT db, const char *issue_id,
+    int (*cb)(ncdbT, uint32_t, uint8_t, const char *, void *), void *ud);
+int ncdb_IssueStateAt(ncdbT db, const char *issue_id, uint32_t ts);
+
 const char  *ncdb_GetLastError(ncdbT db);
 
 #ifdef __cplusplus

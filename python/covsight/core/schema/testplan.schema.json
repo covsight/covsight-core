@@ -1,0 +1,168 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://schema.covsight.io/testplan/v1",
+  "title": "CovSight Testplan",
+  "description": "Schema for the CovSight testplan format (version 1).",
+  "type": "object",
+  "properties": {
+    "$schema":        { "type": "string" },
+    "schema":         { "type": "string" },
+    "format_version": { "type": "integer", "minimum": 1 },
+    "name":           { "type": "string" },
+    "description":    { "type": "string" },
+    "owner":          { "type": "string" },
+    "tags":           { "type": "array", "items": { "type": "string" } },
+    "substitutions":  { "type": "object" },
+    "imports": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/import_entry" }
+    },
+    "testpoints": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/testpoint" }
+    },
+    "goals": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/goal" }
+    },
+    "covergroups": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/covergroup" }
+    },
+    "custom": { "type": "object" }
+  },
+  "additionalProperties": false,
+
+  "$defs": {
+
+    "priority": {
+      "type": "string",
+      "enum": ["high", "medium", "low", ""]
+    },
+
+    "goal_status": {
+      "type": "string",
+      "enum": ["planned", "in_progress", "complete", "waived", ""]
+    },
+
+    "coverage_type": {
+      "type": "string",
+      "enum": [
+        "covergroup", "coverpoint", "cross",
+        "assertion", "expression", "toggle",
+        "line", "branch", "functional"
+      ]
+    },
+
+    "requirement_link": {
+      "type": "object",
+      "properties": {
+        "system":   { "type": "string" },
+        "project":  { "type": "string" },
+        "item_id":  { "type": "string" },
+        "url":      { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+
+    "coverage_binding": {
+      "type": "object",
+      "required": ["type", "path"],
+      "properties": {
+        "type": { "$ref": "#/$defs/coverage_type" },
+        "path": { "type": "string" },
+        "desc": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+
+    "coverpoint_entry": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name":   { "type": "string" },
+        "desc":   { "type": "string" },
+        "path":   { "type": "string" },
+        "custom": { "type": "object" }
+      },
+      "additionalProperties": false
+    },
+
+    "covergroup": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name":        { "type": "string" },
+        "desc":        { "type": "string" },
+        "coverpoints": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/coverpoint_entry" }
+        },
+        "custom": { "type": "object" }
+      },
+      "additionalProperties": false
+    },
+
+    "testpoint": {
+      "type": "object",
+      "required": ["name", "stage"],
+      "properties": {
+        "name":            { "type": "string" },
+        "stage":           { "type": "string" },
+        "desc":            { "type": "string" },
+        "tests":           { "type": "array", "items": { "type": "string" } },
+        "tags":            { "type": "array", "items": { "type": "string" } },
+        "na":              { "type": "boolean" },
+        "source_template": { "type": "string" },
+        "owner":           { "type": "string" },
+        "priority":        { "$ref": "#/$defs/priority" },
+        "weight":          { "type": "integer", "minimum": 1 },
+        "requirements": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/requirement_link" }
+        },
+        "coverage": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/coverage_binding" }
+        },
+        "custom": { "type": "object" }
+      },
+      "additionalProperties": false
+    },
+
+    "goal": {
+      "type": "object",
+      "required": ["id", "title"],
+      "properties": {
+        "id":       { "type": "string" },
+        "title":    { "type": "string" },
+        "desc":     { "type": "string" },
+        "owner":    { "type": "string" },
+        "priority": { "$ref": "#/$defs/priority" },
+        "status":   { "$ref": "#/$defs/goal_status" },
+        "tags":     { "type": "array", "items": { "type": "string" } },
+        "goals": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/goal" }
+        },
+        "testpoints": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/testpoint" }
+        },
+        "custom": { "type": "object" }
+      },
+      "additionalProperties": false
+    },
+
+    "import_entry": {
+      "type": "object",
+      "required": ["path"],
+      "properties": {
+        "path":          { "type": "string" },
+        "substitutions": { "type": "object" }
+      },
+      "additionalProperties": false
+    }
+
+  }
+}

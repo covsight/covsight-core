@@ -7,6 +7,9 @@ import {
   MEMBER_CROSS,
   MEMBER_DESIGN_UNITS,
   MEMBER_HISTORY,
+  MEMBER_ISSUES,
+  MEMBER_ISSUES_HISTORY,
+  MEMBER_ISSUES_META,
   MEMBER_MANIFEST,
   MEMBER_SCOPE_TREE,
   MEMBER_SOURCES,
@@ -47,6 +50,15 @@ export class NcdbWriter {
     const designUnits = new DesignUnitsWriter().write(db);
     if (designUnits.length > 0) {
       zip.file(MEMBER_DESIGN_UNITS, designUnits);
+    }
+    if (db.issues) {
+      zip.file(MEMBER_ISSUES, db.issues.serialize());
+    }
+    if (db.issuesMeta) {
+      zip.file(MEMBER_ISSUES_META, db.issuesMeta.serialize());
+    }
+    if (db.issueHistoryWriter) {
+      zip.file(MEMBER_ISSUES_HISTORY, db.issueHistoryWriter.sealFast(), { compression: 'STORE' });
     }
     await writeFile(path, await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE', compressionOptions: { level: 6 } }));
   }

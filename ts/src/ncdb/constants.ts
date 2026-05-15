@@ -93,3 +93,34 @@ export const DEFAULT_SCOPE_FLAGS = 0;
 export const DEFAULT_SCOPE_WEIGHT = 1;
 export const DEFAULT_SCOPE_GOAL = -1;
 export const DEFAULT_SOURCE_TYPE = SourceT.NONE;
+
+export const MEMBER_ISSUES = 'issues.bin';
+export const MEMBER_ISSUES_META = 'issues_meta.json';
+export const MEMBER_ISSUES_HISTORY = 'issues_history.bin';
+
+export const SEV_INFO = 0;
+export const SEV_LOW = 1;
+export const SEV_MEDIUM = 2;
+export const SEV_HIGH = 3;
+export const SEV_CRITICAL = 4;
+
+export const KIND_DESIGN_BUG = 0;
+export const KIND_TEST_BUG = 1;
+export const KIND_INFRA = 2;
+export const KIND_SPEC_GAP = 3;
+
+export const STATE_OPEN = 0;
+export const STATE_IN_PROGRESS = 1;
+export const STATE_RESOLVED = 2;
+export const STATE_CLOSED = 3;
+export const STATE_WONTFIX = 4;
+
+export const RES_NONE = 0;
+export const RES_FIXED = 1;
+export const RES_WONT_FIX = 2;
+export const RES_DUPLICATE = 3;
+export const RES_NOT_A_BUG = 4;
+
+export const LINK_BLOCKED_BY = 0;
+export const LINK_CAUSED_BY = 1;
+export const LINK_RELATED = 2;

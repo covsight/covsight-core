@@ -24,6 +24,8 @@
 #define NCDB_MEMBER_TOGGLE     "toggle.bin"
 #define NCDB_MEMBER_FSM        "fsm.bin"
 #define NCDB_MEMBER_CROSS      "cross.bin"
+#define NCDB_MEMBER_ISSUES     "issues.bin"
+#define NCDB_MEMBER_ISSUES_HISTORY "issues_history.bin"
 
 #define NCDB_SCOPE_MARKER_REGULAR     0x00
 #define NCDB_SCOPE_MARKER_TOGGLE_PAIR 0x01
@@ -40,6 +42,8 @@
 
 #define NCDB_TOGGLE_BIN_0_TO_1 "0 -> 1"
 #define NCDB_TOGGLE_BIN_1_TO_0 "1 -> 0"
+
+typedef struct ncdb_issues_s ncdb_issues_t;
 
 typedef struct ncdb_buf_s {
     uint8_t *data;
@@ -140,6 +144,9 @@ struct ncdb_s {
     char **sources;
     size_t source_count;
     size_t source_cap;
+    ncdb_issues_t *issues;
+    uint8_t *issues_hist_data;
+    size_t issues_hist_len;
 };
 
 typedef struct ncdb_zip_member_s {

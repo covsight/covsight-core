@@ -81,6 +81,17 @@ def export_junit_xml(
         if r.testpoint.desc:
             ET.SubElement(tc, "system-out").text = r.testpoint.desc
 
+        # Coverage <properties> block
+        if r.coverage_results:
+            props = ET.SubElement(tc, "properties")
+            for cr in r.coverage_results:
+                pct_str = f"{cr.coverage_pct:.1f}" if cr.coverage_pct is not None else "n/a"
+                ET.SubElement(
+                    props, "property",
+                    name=f"coverage.{cr.binding_type}.{cr.path_pattern}",
+                    value=pct_str,
+                )
+
         if r.status == TPStatus.FAILING:
             ET.SubElement(
                 tc,
@@ -143,6 +154,21 @@ def export_github_annotations(
 
     for r in results:
         if r.status == TPStatus.CLOSED or r.status == TPStatus.NA:
+            # Emit ::notice:: for CLOSED testpoints with partial coverage
+            has_partial_cov = any(
+                cr.coverage_pct is not None and cr.coverage_pct < 100.0
+                for cr in r.coverage_results
+            )
+            if has_partial_cov and r.status == TPStatus.CLOSED:
+                avg_pct = sum(
+                    cr.coverage_pct for cr in r.coverage_results
+                    if cr.coverage_pct is not None
+                ) / sum(1 for cr in r.coverage_results if cr.coverage_pct is not None)
+                title = f"[{r.testpoint.stage}] {r.testpoint.name}"
+                output.write(
+                    f"::notice file={file},title={title}::"
+                    f"CLOSED but coverage {avg_pct:.1f}%\n"
+                )
             continue
         title = f"[{r.testpoint.stage}] {r.testpoint.name}"
         msg = (
@@ -241,6 +267,25 @@ def export_summary_markdown(
                 f"| {emoji} {_STATUS_LABEL[r.status]} "
                 f"| {r.pass_count} | {r.fail_count} |"
             )
+        lines.append("")
+
+    # Coverage section — only if any results have coverage data
+    cov_results_with_data = [
+        r for r in results
+        if r.coverage_results and any(cr.coverage_pct is not None for cr in r.coverage_results)
+    ]
+    if cov_results_with_data:
+        lines.append("### Coverage\n")
+        lines.append("| Testpoint | Binding | Path | Coverage % |")
+        lines.append("|-----------|---------|------|----------:|")
+        for r in cov_results_with_data:
+            for cr in r.coverage_results:
+                if cr.coverage_pct is None:
+                    continue
+                lines.append(
+                    f"| {r.testpoint.name} | {cr.binding_type} "
+                    f"| `{cr.path_pattern}` | {cr.coverage_pct:.1f}% |"
+                )
         lines.append("")
 
     # Blocking testpoints

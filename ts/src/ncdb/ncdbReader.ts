@@ -6,6 +6,9 @@ import {
   MEMBER_CROSS,
   MEMBER_DESIGN_UNITS,
   MEMBER_HISTORY,
+  MEMBER_ISSUES,
+  MEMBER_ISSUES_HISTORY,
+  MEMBER_ISSUES_META,
   MEMBER_MANIFEST,
   MEMBER_SCOPE_TREE,
   MEMBER_SOURCES,
@@ -16,6 +19,8 @@ import { CountsReader } from './countsReader.js';
 import { CrossReader } from './crossReader.js';
 import { DesignUnitsReader } from './designUnitsReader.js';
 import { HistoryReader } from './historyReader.js';
+import { IssueSet } from './IssueSet.js';
+import { IssuesHistoryReader } from './issuesHistoryReader.js';
 import { ScopeTreeReader } from './scopeTreeReader.js';
 import { SourcesReader } from './sourcesReader.js';
 import { StringTable } from './stringTable.js';
@@ -57,6 +62,18 @@ export class NcdbReader {
     const crossEntry = zip.file(MEMBER_CROSS);
     if (crossEntry) {
       new CrossReader().read(await crossEntry.async('string'), db);
+    }
+    const issuesEntry = zip.file(MEMBER_ISSUES);
+    if (issuesEntry) {
+      db.issues = IssueSet.fromBytes(await issuesEntry.async('uint8array'));
+    }
+    const issuesMetaEntry = zip.file(MEMBER_ISSUES_META);
+    if (issuesMetaEntry) {
+      db._issuesMetaRaw = await issuesMetaEntry.async('string');
+    }
+    const issuesHistEntry = zip.file(MEMBER_ISSUES_HISTORY);
+    if (issuesHistEntry) {
+      db.issueHistory = new IssuesHistoryReader(await issuesHistEntry.async('uint8array'));
     }
     db.duIndex.clear();
     const duIndex = new DesignUnitsReader().buildIndex(

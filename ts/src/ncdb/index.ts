@@ -16,3 +16,7 @@ export * from './designUnitsReader.js';
 export * from './designUnitsWriter.js';
 export * from './ncdbReader.js';
 export * from './ncdbWriter.js';
+export * from './IssueSet.js';
+export * from './IssuesMeta.js';
+export * from './issuesHistoryWriter.js';
+export * from './issuesHistoryReader.js';

@@ -22,6 +22,7 @@ import pytest
 
 from conftest import (
     SCENARIO_FNS,
+    SCENARIOS_BASE,
     SCENARIOS_C,
     db_to_dict,
     Helpers,
@@ -32,7 +33,7 @@ from conftest import (
 # Python writer → all readers
 # ---------------------------------------------------------------------------
 
-@pytest.mark.parametrize("scenario", list(SCENARIO_FNS.keys()))
+@pytest.mark.parametrize("scenario", SCENARIOS_BASE)
 def test_python_writes_ts_reads(scenario, helpers: Helpers, tmp_path):
     """TypeScript reader must reproduce what Python writer wrote."""
     cdb = tmp_path / f"py_{scenario}.cdb"
@@ -42,7 +43,7 @@ def test_python_writes_ts_reads(scenario, helpers: Helpers, tmp_path):
     assert got == ref, _diff_msg("python", "typescript", scenario, ref, got)
 
 
-@pytest.mark.parametrize("scenario", list(SCENARIO_FNS.keys()))
+@pytest.mark.parametrize("scenario", SCENARIOS_BASE)
 def test_python_writes_c_reads(scenario, helpers: Helpers, tmp_path):
     """C reader must reproduce what Python writer wrote."""
     cdb = tmp_path / f"py_{scenario}.cdb"
@@ -56,7 +57,7 @@ def test_python_writes_c_reads(scenario, helpers: Helpers, tmp_path):
 # TypeScript writer → all readers
 # ---------------------------------------------------------------------------
 
-@pytest.mark.parametrize("scenario", list(SCENARIO_FNS.keys()))
+@pytest.mark.parametrize("scenario", SCENARIOS_BASE)
 def test_ts_writes_python_reads(scenario, helpers: Helpers, tmp_path):
     """Python reader must reproduce what TypeScript writer wrote."""
     cdb = tmp_path / f"ts_{scenario}.cdb"
@@ -66,7 +67,7 @@ def test_ts_writes_python_reads(scenario, helpers: Helpers, tmp_path):
     assert got == ref, _diff_msg("typescript", "python", scenario, got, ref)
 
 
-@pytest.mark.parametrize("scenario", list(SCENARIO_FNS.keys()))
+@pytest.mark.parametrize("scenario", SCENARIOS_BASE)
 def test_ts_writes_c_reads(scenario, helpers: Helpers, tmp_path):
     """C reader must reproduce what TypeScript writer wrote.
 

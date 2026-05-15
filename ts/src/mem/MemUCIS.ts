@@ -10,6 +10,10 @@ import { MemScope } from './MemScope.js';
 import './MemCovergroup.js';
 import './MemCoverpoint.js';
 import './MemCross.js';
+import { IssueSet } from '../ncdb/IssueSet.js';
+import { IssuesMeta } from '../ncdb/IssuesMeta.js';
+import { IssuesHistoryReader } from '../ncdb/issuesHistoryReader.js';
+import { IssuesHistoryWriter } from '../ncdb/issuesHistoryWriter.js';
 
 export class MemUCIS extends MemScope implements UCIS {
   private readonly historyNodesList: MemHistoryNode[] = [];
@@ -20,6 +24,11 @@ export class MemUCIS extends MemScope implements UCIS {
   public writtenTime = 0;
   public modified = false;
   public modifiedSinceSim = false;
+  public issues: IssueSet | null = null;
+  public issuesMeta: IssuesMeta | null = null;
+  public issueHistory: IssuesHistoryReader | null = null;
+  public issueHistoryWriter: IssuesHistoryWriter | null = null;
+  public _issuesMetaRaw: string | null = null;
 
   constructor() {
     super(null, ScopeTypeT.RESERVEDSCOPE, '', null, null);
@@ -36,6 +45,11 @@ export class MemUCIS extends MemScope implements UCIS {
     this.writtenTime = 0;
     this.modified = false;
     this.modifiedSinceSim = false;
+    this.issues = null;
+    this.issuesMeta = null;
+    this.issueHistory = null;
+    this.issueHistoryWriter = null;
+    this._issuesMetaRaw = null;
   }
 
   createHistoryNode(kind: HistoryNodeKind, name: string, parent: HistoryNode | null = null): HistoryNode {
@@ -86,6 +100,14 @@ export class MemUCIS extends MemScope implements UCIS {
 
   getFileHandles(): readonly FileHandle[] {
     return this.fileHandleList;
+  }
+
+  getIssuesMeta(): IssuesMeta | null {
+    if (this.issuesMeta === null && this._issuesMetaRaw !== null) {
+      this.issuesMeta = IssuesMeta.fromJson(this._issuesMetaRaw);
+      this._issuesMetaRaw = null;
+    }
+    return this.issuesMeta;
   }
 
   override getIntProperty(prop: IntProperty): number {

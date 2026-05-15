@@ -164,8 +164,63 @@ static int hist_cb(ncdbT db, ncdbHistoryNodeT node, void *ud) {
     return 0;
 }
 
+/* -------------------------------------------------------------------------
+ * Issue iteration callbacks for cmd_read
+ * ---------------------------------------------------------------------- */
+
+typedef struct { int first; } IssueCtx;
+
+static int issue_cb(ncdbT db, ncdbIssueT issue, void *ud) {
+    IssueCtx *ctx = (IssueCtx *)ud;
+    if (!ctx->first) { printf(",\n"); } else { printf("\n"); }
+    ctx->first = 0;
+    printf("    {\n");
+    printf("      \"id\": ");         jstr(ncdb_GetIssueId(db, issue));         printf(",\n");
+    printf("      \"ext\": ");        jstr(ncdb_GetIssueExt(db, issue));        printf(",\n");
+    printf("      \"severity\": %d,\n", (int)ncdb_GetIssueSeverity(db, issue));
+    printf("      \"kind\": %d,\n",     (int)ncdb_GetIssueKind(db, issue));
+    printf("      \"state\": %d,\n",    (int)ncdb_GetIssueState(db, issue));
+    printf("      \"resolution\": %d\n",(int)ncdb_GetIssueResolution(db, issue));
+    printf("    }");
+    return 0;
+}
+
+static int waiver_link_cb(ncdbT db, const char *waiver_id, const char *issue_id, void *ud) {
+    IssueCtx *ctx = (IssueCtx *)ud;
+    if (!ctx->first) { printf(",\n"); } else { printf("\n"); }
+    ctx->first = 0;
+    printf("    {\"waiver_id\": "); jstr(waiver_id);
+    printf(", \"issue_id\": "); jstr(issue_id); printf("}");
+    (void)db;
+    return 0;
+}
+
+static int tp_link_cb(ncdbT db, const char *tp_name, const char *issue_id,
+                      uint8_t link_type, void *ud) {
+    IssueCtx *ctx = (IssueCtx *)ud;
+    if (!ctx->first) { printf(",\n"); } else { printf("\n"); }
+    ctx->first = 0;
+    printf("    {\"tp_name\": "); jstr(tp_name);
+    printf(", \"issue_id\": "); jstr(issue_id);
+    printf(", \"link_type\": %d}", (int)link_type);
+    (void)db;
+    return 0;
+}
+
+static int cov_link_cb(ncdbT db, const char *scope_path, const char *bin_name,
+                       const char *issue_id, uint8_t link_type, void *ud) {
+    IssueCtx *ctx = (IssueCtx *)ud;
+    if (!ctx->first) { printf(",\n"); } else { printf("\n"); }
+    ctx->first = 0;
+    printf("    {\"scope_path\": "); jstr(scope_path);
+    printf(", \"bin_name\": ");   jstr(bin_name);
+    printf(", \"issue_id\": ");   jstr(issue_id);
+    printf(", \"link_type\": %d}", (int)link_type);
+    (void)db;
+    return 0;
+}
+
 static int cmd_read(const char *path) {
-    char errbuf[256] = {0};
     ncdbT db = ncdb_Open(NULL);
     if (!db) { fprintf(stderr, "ncdb_Open failed\n"); return 1; }
     if (ncdb_Read(db, path) != 0) {
@@ -188,7 +243,34 @@ static int cmd_read(const char *path) {
     printf("  \"scopes\": [");
     ncdb_ScopeIterate(db, NULL, (uint32_t)NCDB_SCOPE_ALL, top_scope_cb, &scope_ctx);
     if (!scope_ctx.first) { printf("\n  "); }
-    printf("]\n}\n");
+    printf("]");
+
+    /* Emit issues if any */
+    IssueCtx issue_ctx = { 1 };
+    /* Run a trial iteration to check count via side effect; use a counter approach */
+    /* Simpler: always emit arrays, empty if no issues */
+    {
+        IssueCtx ic = { 1 }, wc = { 1 }, tc = { 1 }, cc = { 1 };
+        printf(",\n  \"issues\": [");
+        ncdb_IssueIterate(db, issue_cb, &ic);
+        if (!ic.first) { printf("\n  "); }
+        printf("]");
+        printf(",\n  \"waiver_links\": [");
+        ncdb_WaiverLinkIterate(db, waiver_link_cb, &wc);
+        if (!wc.first) { printf("\n  "); }
+        printf("]");
+        printf(",\n  \"testpoint_links\": [");
+        ncdb_TestpointLinkIterate(db, tp_link_cb, &tc);
+        if (!tc.first) { printf("\n  "); }
+        printf("]");
+        printf(",\n  \"coverage_links\": [");
+        ncdb_CoverageLinkIterate(db, cov_link_cb, &cc);
+        if (!cc.first) { printf("\n  "); }
+        printf("]");
+    }
+
+    printf("\n}\n");
+    (void)issue_ctx;
 
     ncdb_Close(db);
     return 0;

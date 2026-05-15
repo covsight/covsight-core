@@ -20,6 +20,8 @@ analysis ecosystem. It provides:
 
    * - :doc:`getting-started/quickstart`
      - Get up and running in 5 minutes
+   * - :doc:`getting-started/testplans`
+     - Author and analyse verification testplans
    * - :doc:`reference/python-api/index`
      - Complete API reference for every class and enum
    * - :doc:`reference/formats/ncdb`
@@ -33,6 +35,7 @@ analysis ecosystem. It provides:
    :caption: Getting Started
 
    getting-started/quickstart
+   getting-started/testplans
 
 .. toctree::
    :maxdepth: 2

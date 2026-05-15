@@ -15,6 +15,15 @@ import { HistoryNodeKind } from '../../../ts/dist/api/enums/HistoryNodeKind.js';
 import { IntProperty } from '../../../ts/dist/api/enums/IntProperty.js';
 import { SourceInfo } from '../../../ts/dist/api/SourceInfo.js';
 import { TestData } from '../../../ts/dist/api/TestData.js';
+import { IssueSet, IssueSpec } from '../../../ts/dist/ncdb/IssueSet.js';
+import {
+  SEV_HIGH, SEV_LOW, SEV_MEDIUM, SEV_CRITICAL,
+  KIND_DESIGN_BUG, KIND_TEST_BUG,
+  STATE_OPEN, STATE_IN_PROGRESS, STATE_RESOLVED, STATE_CLOSED,
+  RES_NONE, RES_FIXED, RES_WONT_FIX,
+  LINK_BLOCKED_BY, LINK_CAUSED_BY, LINK_RELATED,
+} from '../../../ts/dist/ncdb/constants.js';
+import { IssuesMeta } from '../../../ts/dist/ncdb/IssuesMeta.js';
 
 // ---------------------------------------------------------------------------
 // READ: load a .cdb and emit canonical JSON
@@ -82,6 +91,38 @@ async function cmdRead(filePath) {
   }
 
   const doc = { format: 'ncdb-dump-v1', history, scopes };
+
+  const issuesList = [];
+  const waiverLinks = [];
+  const tpLinks = [];
+  const covLinks = [];
+  if (db.issues) {
+    for (const handle of db.issues.issues()) {
+      issuesList.push({
+        id:         handle.id,
+        ext:        handle.ext,
+        severity:   handle.severity,
+        kind:       handle.kind,
+        state:      handle.state,
+        resolution: handle.resolution,
+      });
+      for (const lk of db.issues.waiversForIssue(handle)) {
+        waiverLinks.push({ waiver_id: lk.waiverId, issue_id: lk.issueId });
+      }
+      for (const lk of db.issues.testpointsForIssue(handle)) {
+        tpLinks.push({ tp_name: lk.testpointName, issue_id: lk.issueId, link_type: lk.linkType });
+      }
+    }
+    for (const lk of db.issues.coverageLinks()) {
+      covLinks.push({ scope_path: lk.scopePath, bin_name: lk.binName,
+                      issue_id: lk.issueId, link_type: lk.linkType });
+    }
+  }
+  doc.issues = issuesList;
+  doc.waiver_links = waiverLinks;
+  doc.testpoint_links = tpLinks;
+  doc.coverage_links = covLinks;
+
   process.stdout.write(JSON.stringify(doc, null, 2) + '\n');
 }
 
@@ -199,6 +240,71 @@ const scenarios = {
     cg.setIntProperty(IntProperty.SCOPE_GOAL, 80);
     const cp = cg.createCoverpoint('cp0');
     cp.createBin('b0', CoverTypeT.CVGBIN, 1n, 1n);
+  },
+
+  issues_minimal: async (db) => {
+    const issues = new IssueSet();
+    issues.addIssue(new IssueSpec({
+      id: 'I-001', ext: 'EXT-1',
+      severity: SEV_HIGH, kind: KIND_DESIGN_BUG,
+      state: STATE_OPEN, resolution: RES_NONE,
+      createdAt: 1000, updatedAt: 1000, syncedAt: 0,
+    }));
+    issues.addIssue(new IssueSpec({
+      id: 'I-002', ext: '',
+      severity: SEV_LOW, kind: KIND_TEST_BUG,
+      state: STATE_CLOSED, resolution: RES_FIXED,
+      createdAt: 2000, updatedAt: 2001, syncedAt: 0,
+    }));
+    issues.addWaiverLink('W-001', 'I-001');
+    db.issues = issues;
+  },
+
+  issues_full: async (db) => {
+    // Coverage data coexisting with issues
+    const cg = db.createCovergroupDef('cg_iss');
+    const cp = cg.createCoverpoint('cp0');
+    cp.createBin('b0', CoverTypeT.CVGBIN, 5n, 1n);
+
+    const issues = new IssueSet();
+    const h1 = issues.addIssue(new IssueSpec({
+      id: 'I-001', ext: 'BUG-42',
+      severity: SEV_CRITICAL, kind: KIND_DESIGN_BUG,
+      state: STATE_IN_PROGRESS, resolution: RES_NONE,
+      createdAt: 1000, updatedAt: 1100, syncedAt: 0,
+    }));
+    const h2 = issues.addIssue(new IssueSpec({
+      id: 'I-002', ext: '',
+      severity: SEV_MEDIUM, kind: KIND_TEST_BUG,
+      state: STATE_RESOLVED, resolution: RES_FIXED,
+      createdAt: 2000, updatedAt: 2500, syncedAt: 0,
+    }));
+    issues.addIssue(new IssueSpec({
+      id: 'I-003', ext: 'SPEC-7',
+      severity: SEV_LOW, kind: KIND_TEST_BUG,
+      state: STATE_OPEN, resolution: RES_NONE,
+      createdAt: 3000, updatedAt: 3000, syncedAt: 0,
+    }));
+    const h4 = issues.addIssue(new IssueSpec({
+      id: 'I-004', ext: '',
+      severity: SEV_HIGH, kind: KIND_DESIGN_BUG,
+      state: STATE_CLOSED, resolution: RES_WONT_FIX,
+      createdAt: 4000, updatedAt: 4100, syncedAt: 0,
+    }));
+    issues.addWaiverLink('W-001', 'I-001');
+    issues.addWaiverLink('W-002', 'I-003');
+    issues.addTestpointLink('tp_smoke', 'I-002', LINK_BLOCKED_BY);
+    issues.addTestpointLink('tp_reg',   'I-004', LINK_CAUSED_BY);
+    issues.addCoverageLink('cg_iss', 'b0', 'I-001', LINK_RELATED);
+    db.issues = issues;
+
+    const meta = new IssuesMeta();
+    meta.setTitle(h1, 'Critical design bug in arbiter');
+    meta.setUrl(h1,   'https://bugs.example.com/42');
+    meta.setTitle(h2, 'Test flakiness in smoke suite');
+    // h3 intentionally no meta
+    meta.setTitle(h4, "Won't fix \u2014 by design");
+    db.issuesMeta = meta;
   },
 };
 

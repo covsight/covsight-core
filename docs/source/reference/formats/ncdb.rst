@@ -111,6 +111,15 @@ optional (O).
    * - ``squash_log.bin``
      - O
      - v2 log of squashed (deduplicated) test runs.
+   * - ``issues.bin``
+     - O
+     - Issue records: ids, severity/kind/state/resolution enums, and link tables.
+   * - ``issues_meta.json``
+     - O
+     - Per-issue rich metadata (title, URL) — positional JSON array.
+   * - ``issues_history.bin``
+     - O
+     - Columnar history of issue state transitions (compressed).
 
 -----
 
@@ -493,3 +502,118 @@ All format constants are centralised in
    :members:
    :undoc-members:
    :member-order: bysource
+
+-----
+
+issues.bin
+==========
+
+Binary issue-tracking data.  Present only when the database contains at least
+one issue record.
+
+**Magic / header (25 bytes)**::
+
+   magic       u32 LE  0x49535342 ('ISSB')
+   version     u8      1
+   synced_at   u32 LE  global sync timestamp (0 = never synced)
+   num_issues  u32 LE
+   num_wl      u32 LE  number of waiver–issue links
+   num_tl      u32 LE  number of testpoint–issue links
+   num_cl      u32 LE  number of coverage–issue links
+
+Immediately following the header is a **string table** in the same
+varint-prefixed wire format as ``strings.bin`` (count then length-prefixed
+UTF-8 entries).  All string fields in the records below are stored as
+16-bit indices into this table.
+
+**Issue record (18 bytes each)**::
+
+   id_idx      u16 LE  index of the issue ID string
+   ext_idx     u16 LE  index of the external tracker ID string (may be empty)
+   enums       u16 LE  packed severity/kind/state/resolution (see below)
+   created_at  u32 LE  creation Unix timestamp
+   updated_at  u32 LE  last-update Unix timestamp
+   synced_at   u32 LE  last-sync Unix timestamp
+
+Enum packing within ``enums`` (u16):
+
+* bits 15–13: severity  (0=info, 1=low, 2=medium, 3=high, 4=critical)
+* bits 12–11: kind       (0=design-bug, 1=test-bug, 2=infra, 3=spec-gap)
+* bits 10–8:  state      (0=open, 1=in-progress, 2=resolved, 3=closed, 4=wontfix)
+* bits 7–5:   resolution (0=none, 1=fixed, 2=wont-fix, 3=duplicate, 4=not-a-bug)
+
+**Waiver–issue link record (4 bytes each)**::
+
+   waiver_id_idx  u16 LE
+   issue_id_idx   u16 LE
+
+**Testpoint–issue link record (5 bytes each)**::
+
+   tp_name_idx    u16 LE
+   issue_id_idx   u16 LE
+   link_type      u8    (0=blocked-by, 1=caused-by, 2=related)
+
+**Coverage–issue link record (7 bytes each)**::
+
+   scope_path_idx u16 LE
+   bin_name_idx   u16 LE
+   issue_id_idx   u16 LE
+   link_type      u8
+
+-----
+
+issues_meta.json
+================
+
+Optional JSON metadata for issues.  The top-level object is::
+
+   {"v": 1, "m": [ <entry>, ... ]}
+
+Each ``<entry>`` is positionally keyed by the issue's index in ``issues.bin``
+(same order as the issue records).  An entry is either ``null`` (no rich
+metadata for that issue) or an object::
+
+   {"ti": "<title>", "ur": "<url>"}
+
+Either ``"ti"`` or ``"ur"`` (or both) may be absent if not available.
+
+-----
+
+issues_history.bin
+==================
+
+Columnar history of issue state transitions.  The file is self-compressed:
+sealed archives use LZMA (XZ magic ``\\xfd7zXZ\\x00``); live databases use
+zlib DEFLATE.
+
+After decompression, the binary layout is:
+
+**Header (15 bytes)**::
+
+   magic           u32 LE  0x49535348 ('ISSH')
+   version         u8      1
+   num_id_strings  u16 LE  size of the ID string table
+   num_comments    u16 LE  size of the comment string table
+   num_issues      u16 LE  number of issues with history rows
+   num_records     u32 LE  total rows across all issues
+
+**ID string table**: ``num_id_strings`` entries, each a ``u8`` length
+followed by that many UTF-8 bytes.
+
+**Comment string table**: ``num_comments`` entries in the same format.
+
+**Issue index**: ``num_issues`` entries of 8 bytes each::
+
+   id_str_idx  u16 LE  index into the ID string table
+   start_row   u32 LE  first row index in the column arrays
+   count       u16 LE  number of rows for this issue
+
+**Column arrays** (one value per row, in ascending timestamp order):
+
+* ``ts_base`` – u32 LE global minimum timestamp; delta encoding is relative
+  to this value.
+* ``ts_deltas`` – per-row unsigned LEB128 varints giving ``(ts - ts_base)``
+  for each row.
+* ``state_bytes`` – one u8 per row (state value 0–4).
+* ``comment_idxs`` – one u16 LE per row (index into comment table, or
+  ``0xFFFF`` if no comment).

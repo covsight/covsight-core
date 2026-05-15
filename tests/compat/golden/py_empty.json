@@ -1,5 +1,9 @@
 {
+  "coverage_links": [],
   "format": "ncdb-dump-v1",
   "history": [],
-  "scopes": []
+  "issues": [],
+  "scopes": [],
+  "testpoint_links": [],
+  "waiver_links": []
 }

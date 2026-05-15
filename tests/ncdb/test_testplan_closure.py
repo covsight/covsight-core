@@ -204,3 +204,170 @@ class TestStageGateStatus:
         plan, results = self._plan_and_results({"tp": ("V1", TPStatus.CLOSED)})
         gate = stage_gate_status(results, "V1", plan)
         assert gate["stage"] == "V1"
+
+
+# ── iter_testpoints integration ───────────────────────────────────────────────
+
+class TestGoalTestpoints:
+    """compute_closure must include testpoints nested inside goals."""
+
+    def test_goal_testpoints_included(self):
+        from covsight.core.ncdb.testplan import Goal
+        plan = Testplan()
+        plan.goals = [Goal(
+            id="g1", title="Goal 1",
+            testpoints=[Testpoint("goal_tp", stage="V1", tests=["goal_test"])],
+        )]
+        db = _db_with(goal_test=(3, 0))
+        results = compute_closure(plan, db)
+        names = {r.testpoint.name for r in results}
+        assert "goal_tp" in names
+
+    def test_goal_testpoints_status_computed(self):
+        from covsight.core.ncdb.testplan import Goal
+        plan = Testplan()
+        plan.goals = [Goal(
+            id="g1", title="Goal 1",
+            testpoints=[Testpoint("goal_tp", stage="V1", tests=["goal_test"])],
+        )]
+        db = _db_with(goal_test=(2, 1))
+        results = compute_closure(plan, db)
+        r = next(r for r in results if r.testpoint.name == "goal_tp")
+        assert r.status == TPStatus.PARTIAL
+
+    def test_top_level_and_goal_testpoints_combined(self):
+        from covsight.core.ncdb.testplan import Goal
+        plan = Testplan()
+        plan.testpoints = [Testpoint("top_tp", stage="V1", tests=["top_test"])]
+        plan.goals = [Goal(
+            id="g1", title="G",
+            testpoints=[Testpoint("nested_tp", stage="V1", tests=["nested_test"])],
+        )]
+        db = _db_with(top_test=(1, 0), nested_test=(1, 0))
+        results = compute_closure(plan, db)
+        names = {r.testpoint.name for r in results}
+        assert names == {"top_tp", "nested_tp"}
+
+
+# ── compute_coverage_binding ──────────────────────────────────────────────────
+
+class TestComputeCoverageBinding:
+    from covsight.core.ncdb.testplan_closure import compute_coverage_binding
+
+    def _tp_with_binding(self, path, btype="covergroup"):
+        from covsight.core.ncdb.testplan import CoverageBinding
+        tp = Testpoint("tp", stage="V1", tests=["t"])
+        tp.coverage = [CoverageBinding(type=btype, path=path)]
+        return tp
+
+    class _CovDB:
+        """Fake DB that exposes coverageItems and getCoveragePercent."""
+        def __init__(self, paths, pct_map=None):
+            self._paths = paths
+            self._pct_map = pct_map or {}
+            self._test_registry = None
+
+        def coverageItems(self):
+            return self._paths
+
+        def getCoveragePercent(self, path):
+            return self._pct_map.get(path)
+
+        def historyNodes(self, _):
+            return []
+
+    def test_exact_path_resolved(self):
+        from covsight.core.ncdb.testplan_closure import compute_coverage_binding
+        tp = self._tp_with_binding("top.dut.cg")
+        db = self._CovDB(["top.dut.cg", "top.dut.other"])
+        results = compute_coverage_binding(tp, db)
+        assert len(results) == 1
+        assert results[0].matched_paths == ["top.dut.cg"]
+
+    def test_glob_path_expanded(self):
+        from covsight.core.ncdb.testplan_closure import compute_coverage_binding
+        tp = self._tp_with_binding("top.dut.*")
+        db = self._CovDB(["top.dut.cg1", "top.dut.cg2", "top.other.cg"])
+        results = compute_coverage_binding(tp, db)
+        assert set(results[0].matched_paths) == {"top.dut.cg1", "top.dut.cg2"}
+
+    def test_coverage_pct_populated(self):
+        from covsight.core.ncdb.testplan_closure import compute_coverage_binding
+        tp = self._tp_with_binding("top.dut.cg")
+        db = self._CovDB(["top.dut.cg"], {"top.dut.cg": 87.5})
+        results = compute_coverage_binding(tp, db)
+        assert results[0].coverage_pct == pytest.approx(87.5)
+
+    def test_no_coverage_bindings_returns_empty(self):
+        from covsight.core.ncdb.testplan_closure import compute_coverage_binding
+        tp = Testpoint("tp", stage="V1", tests=["t"])
+        db = self._CovDB([])
+        assert compute_coverage_binding(tp, db) == []
+
+    def test_no_coverageItems_on_db(self):
+        """DB without coverageItems: exact path still resolves."""
+        from covsight.core.ncdb.testplan_closure import compute_coverage_binding
+        tp = self._tp_with_binding("top.dut.cg")
+        db = _db_with()  # no coverageItems method
+        results = compute_coverage_binding(tp, db)
+        assert results[0].matched_paths == ["top.dut.cg"]
+
+    def test_binding_type_preserved(self):
+        from covsight.core.ncdb.testplan_closure import compute_coverage_binding
+        tp = self._tp_with_binding("top.*", btype="assertion")
+        db = self._CovDB(["top.a", "top.b"])
+        results = compute_coverage_binding(tp, db)
+        assert results[0].binding_type == "assertion"
+
+    def test_coverage_results_attached_to_result(self):
+        """compute_closure attaches coverage_results to TestpointResult."""
+        from covsight.core.ncdb.testplan import CoverageBinding
+        tp = Testpoint("tp", stage="V1", tests=["t"])
+        tp.coverage = [CoverageBinding(type="covergroup", path="top.cg")]
+        plan = Testplan()
+        plan.testpoints = [tp]
+        db = _db_with(t=(1, 0))
+        results = compute_closure(plan, db)
+        assert len(results[0].coverage_results) == 1
+        assert results[0].coverage_results[0].path_pattern == "top.cg"
+
+
+# ── require_goals_closed ──────────────────────────────────────────────────────
+
+class TestRequireGoalsClosed:
+    def test_require_goals_closed_passes_all_closed(self):
+        from covsight.core.ncdb.testplan import Goal
+        plan = Testplan()
+        plan.goals = [Goal(
+            id="g1", title="G",
+            testpoints=[Testpoint("g_tp", stage="V1", tests=["g_test"])],
+        )]
+        db = _db_with(g_test=(1, 0))
+        results = compute_closure(plan, db)
+        gate = stage_gate_status(results, "V1", plan, require_goals_closed=True)
+        assert gate["passed"] is True
+
+    def test_require_goals_closed_fails_nested_failing(self):
+        from covsight.core.ncdb.testplan import Goal
+        plan = Testplan()
+        plan.goals = [Goal(
+            id="g1", title="G",
+            testpoints=[Testpoint("g_tp", stage="V3", tests=["g_test"])],
+        )]
+        db = _db_with(g_test=(0, 1))
+        results = compute_closure(plan, db)
+        gate = stage_gate_status(results, "V1", plan, require_goals_closed=True)
+        assert gate["passed"] is False
+
+    def test_default_ignores_nested_higher_stage(self):
+        from covsight.core.ncdb.testplan import Goal
+        plan = Testplan()
+        plan.testpoints = [Testpoint("tp", stage="V1", tests=["t"])]
+        plan.goals = [Goal(
+            id="g1", title="G",
+            testpoints=[Testpoint("g_tp", stage="V3", tests=["g_test"])],
+        )]
+        db = _db_with(t=(1, 0), g_test=(0, 1))
+        results = compute_closure(plan, db)
+        gate = stage_gate_status(results, "V1", plan)
+        assert gate["passed"] is True

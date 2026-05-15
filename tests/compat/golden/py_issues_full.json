@@ -1,0 +1,102 @@
+{
+  "coverage_links": [
+    {
+      "bin_name": "b0",
+      "issue_id": "I-001",
+      "link_type": 2,
+      "scope_path": "cg_iss"
+    }
+  ],
+  "format": "ncdb-dump-v1",
+  "history": [],
+  "issues": [
+    {
+      "ext": "BUG-42",
+      "id": "I-001",
+      "kind": 0,
+      "resolution": 0,
+      "severity": 4,
+      "state": 1
+    },
+    {
+      "ext": "",
+      "id": "I-002",
+      "kind": 1,
+      "resolution": 1,
+      "severity": 2,
+      "state": 2
+    },
+    {
+      "ext": "SPEC-7",
+      "id": "I-003",
+      "kind": 1,
+      "resolution": 0,
+      "severity": 1,
+      "state": 0
+    },
+    {
+      "ext": "",
+      "id": "I-004",
+      "kind": 0,
+      "resolution": 2,
+      "severity": 3,
+      "state": 3
+    }
+  ],
+  "scopes": [
+    {
+      "children": [
+        {
+          "children": [],
+          "crossed_points": null,
+          "goal": -1,
+          "items": [
+            {
+              "atLeast": 1,
+              "count": 5,
+              "coverType": 1,
+              "name": "b0"
+            }
+          ],
+          "name": "cp0",
+          "source_file": null,
+          "source_line": 0,
+          "source_token": 0,
+          "type": 16384,
+          "weight": 1
+        }
+      ],
+      "crossed_points": null,
+      "goal": -1,
+      "items": [],
+      "name": "cg_iss",
+      "source_file": null,
+      "source_line": 0,
+      "source_token": 0,
+      "type": 4096,
+      "weight": 1
+    }
+  ],
+  "testpoint_links": [
+    {
+      "issue_id": "I-002",
+      "link_type": 0,
+      "tp_name": "tp_smoke"
+    },
+    {
+      "issue_id": "I-004",
+      "link_type": 1,
+      "tp_name": "tp_reg"
+    }
+  ],
+  "waiver_links": [
+    {
+      "issue_id": "I-001",
+      "waiver_id": "W-001"
+    },
+    {
+      "issue_id": "I-003",
+      "waiver_id": "W-002"
+    }
+  ]
+}

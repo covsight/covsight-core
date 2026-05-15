@@ -227,3 +227,153 @@ class TestExportSummaryMarkdown:
         # The heading line "| Testpoint" is present but tp_na row should not be
         rows = [l for l in md.splitlines() if "tp_na" in l and "|" in l]
         assert rows == []
+
+
+# ── coverage <properties> in JUnit XML ───────────────────────────────────────
+
+class TestJUnitCoverageProperties:
+    def _make_cov_result(self, tp, status, pct):
+        from covsight.core.ncdb.testplan import CoverageBinding
+        from covsight.core.ncdb.testplan_closure import CoverageResult
+        tp.coverage = [CoverageBinding(type="covergroup", path="top.cg")]
+        r = TestpointResult(
+            testpoint=tp, status=status, matched_tests=["t"],
+            pass_count=1 if status == TPStatus.CLOSED else 0, fail_count=0,
+            coverage_results=[
+                CoverageResult(
+                    binding_type="covergroup",
+                    path_pattern="top.cg",
+                    matched_paths=["top.cg"],
+                    coverage_pct=pct,
+                )
+            ],
+        )
+        return r
+
+    def test_properties_written_when_coverage_available(self, tmp_path):
+        tp = _make_tp("tp_cov", "V1")
+        r = self._make_cov_result(tp, TPStatus.CLOSED, 87.5)
+        out = str(tmp_path / "out.xml")
+        export_junit_xml([r], out)
+        tree = ET.parse(out)
+        props = tree.findall(".//properties/property")
+        assert props, "Expected <properties> element"
+        assert any("coverage" in p.get("name", "") for p in props)
+
+    def test_property_value_is_pct_string(self, tmp_path):
+        tp = _make_tp("tp_cov", "V1")
+        r = self._make_cov_result(tp, TPStatus.CLOSED, 75.0)
+        out = str(tmp_path / "out.xml")
+        export_junit_xml([r], out)
+        tree = ET.parse(out)
+        props = tree.findall(".//properties/property")
+        values = [p.get("value") for p in props]
+        assert any("75.0" in v for v in values)
+
+    def test_no_properties_when_no_coverage(self, tmp_path):
+        tp = _make_tp("tp_no_cov", "V1")
+        r = _make_result(tp, TPStatus.CLOSED, pass_count=1, matched=["t"])
+        out = str(tmp_path / "out.xml")
+        export_junit_xml([r], out)
+        tree = ET.parse(out)
+        props = tree.findall(".//properties")
+        assert props == []
+
+
+# ── GitHub ::notice:: for partially-covered CLOSED testpoints ─────────────────
+
+class TestGitHubNoticeForCoverage:
+    def _closed_result_with_pct(self, name, pct):
+        from covsight.core.ncdb.testplan import CoverageBinding
+        from covsight.core.ncdb.testplan_closure import CoverageResult
+        tp = _make_tp(name, "V1")
+        tp.coverage = [CoverageBinding(type="covergroup", path="top.cg")]
+        return TestpointResult(
+            testpoint=tp, status=TPStatus.CLOSED, matched_tests=["t"],
+            pass_count=1, fail_count=0,
+            coverage_results=[
+                CoverageResult("covergroup", "top.cg", ["top.cg"], pct)
+            ],
+        )
+
+    def test_notice_emitted_for_partial_coverage(self):
+        r = self._closed_result_with_pct("tp_low_cov", 60.0)
+        buf = io.StringIO()
+        export_github_annotations([r], output=buf)
+        out = buf.getvalue()
+        assert "::notice" in out
+        assert "tp_low_cov" in out
+
+    def test_no_notice_for_full_coverage(self):
+        r = self._closed_result_with_pct("tp_full", 100.0)
+        buf = io.StringIO()
+        export_github_annotations([r], output=buf)
+        assert buf.getvalue() == ""
+
+    def test_no_notice_when_coverage_pct_none(self):
+        from covsight.core.ncdb.testplan import CoverageBinding
+        from covsight.core.ncdb.testplan_closure import CoverageResult
+        tp = _make_tp("tp_no_pct", "V1")
+        r = TestpointResult(
+            testpoint=tp, status=TPStatus.CLOSED, matched_tests=["t"],
+            pass_count=1, fail_count=0,
+            coverage_results=[
+                CoverageResult("covergroup", "top.cg", ["top.cg"], None)
+            ],
+        )
+        buf = io.StringIO()
+        export_github_annotations([r], output=buf)
+        assert buf.getvalue() == ""
+
+
+# ── markdown coverage section ─────────────────────────────────────────────────
+
+class TestMarkdownCoverageSection:
+    def _make_result_with_pct(self, name, pct):
+        from covsight.core.ncdb.testplan import CoverageBinding
+        from covsight.core.ncdb.testplan_closure import CoverageResult
+        tp = _make_tp(name, "V1")
+        tp.coverage = [CoverageBinding(type="covergroup", path="top.cg")]
+        return TestpointResult(
+            testpoint=tp, status=TPStatus.CLOSED, matched_tests=["t"],
+            pass_count=1, fail_count=0,
+            coverage_results=[
+                CoverageResult("covergroup", "top.cg", ["top.cg"], pct)
+            ],
+        )
+
+    def test_coverage_section_present_when_pct_available(self):
+        r = self._make_result_with_pct("tp1", 87.5)
+        md = export_summary_markdown([r])
+        assert "Coverage" in md
+        assert "87.5" in md
+
+    def test_coverage_section_absent_when_no_pct(self):
+        from covsight.core.ncdb.testplan import CoverageBinding
+        from covsight.core.ncdb.testplan_closure import CoverageResult
+        tp = _make_tp("tp1", "V1")
+        r = TestpointResult(
+            testpoint=tp, status=TPStatus.CLOSED, matched_tests=["t"],
+            pass_count=1, fail_count=0,
+            coverage_results=[
+                CoverageResult("covergroup", "top.cg", [], None)
+            ],
+        )
+        md = export_summary_markdown([r])
+        assert "### Coverage" not in md
+
+    def test_coverage_section_absent_when_no_coverage_results(self):
+        tp = _make_tp("tp1", "V1")
+        r = _make_result(tp, TPStatus.CLOSED, pass_count=1, matched=["t"])
+        md = export_summary_markdown([r])
+        assert "### Coverage" not in md
+
+    def test_coverage_section_shows_binding_type(self):
+        r = self._make_result_with_pct("tp1", 75.0)
+        md = export_summary_markdown([r])
+        assert "covergroup" in md
+
+    def test_coverage_section_shows_path(self):
+        r = self._make_result_with_pct("tp1", 75.0)
+        md = export_summary_markdown([r])
+        assert "top.cg" in md

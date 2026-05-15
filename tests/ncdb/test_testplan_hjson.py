@@ -69,8 +69,8 @@ class TestExpandTests:
 
 # ── import_hjson ──────────────────────────────────────────────────────────────
 
-def _write_hjson(tmp_path, data: dict) -> str:
-    path = str(tmp_path / "plan.json")
+def _write_hjson(tmp_path, data: dict, name: str = "plan.json") -> str:
+    path = str(tmp_path / name)
     with open(path, "w") as f:
         json.dump(data, f)
     return path
@@ -178,3 +178,138 @@ class TestImportHjson:
         plan = import_hjson(path)
         assert plan.testpoints == []
         assert plan.covergroups == []
+
+
+# ── import_testplans (OpenTitan import key) ───────────────────────────────────
+
+class TestImportTestplans:
+    def test_import_testplans_merged(self, tmp_path):
+        child_path = _write_hjson(tmp_path, {
+            "testpoints": [{"name": "child_tp", "stage": "V1",
+                             "tests": ["child_test"]}],
+        }, name="child.json")
+        parent_path = _write_hjson(tmp_path, {
+            "testpoints": [{"name": "parent_tp", "stage": "V1",
+                             "tests": ["parent_test"]}],
+            "import_testplans": [child_path],
+        })
+        plan = import_hjson(parent_path)
+        names = {tp.name for tp in plan.testpoints}
+        assert "parent_tp" in names
+        assert "child_tp" in names
+
+    def test_import_testplans_transitive(self, tmp_path):
+        grand_path = _write_hjson(tmp_path, {
+            "testpoints": [{"name": "grand_tp", "stage": "V1", "tests": ["g"]}],
+        }, name="grand.json")
+        mid_path = _write_hjson(tmp_path, {
+            "testpoints": [{"name": "mid_tp", "stage": "V1", "tests": ["m"]}],
+            "import_testplans": [grand_path],
+        }, name="mid.json")
+        parent_path = _write_hjson(tmp_path, {
+            "testpoints": [{"name": "top_tp", "stage": "V1", "tests": ["t"]}],
+            "import_testplans": [mid_path],
+        })
+        plan = import_hjson(parent_path)
+        names = {tp.name for tp in plan.testpoints}
+        assert names == {"top_tp", "mid_tp", "grand_tp"}
+
+
+# ── plan-level substitutions ──────────────────────────────────────────────────
+
+class TestPlanLevelSubstitutions:
+    def test_name_key_used_as_substitution(self, tmp_path):
+        path = _write_hjson(tmp_path, {
+            "name": "uart",
+            "testpoints": [{"name": "tp", "stage": "V1",
+                             "tests": ["{name}_smoke"]}],
+        })
+        plan = import_hjson(path)
+        assert plan.testpoints[0].tests == ["uart_smoke"]
+
+    def test_file_substitutions_dict_used(self, tmp_path):
+        path = _write_hjson(tmp_path, {
+            "substitutions": {"baud": ["9600", "115200"]},
+            "testpoints": [{"name": "tp", "stage": "V1",
+                             "tests": ["{baud}_test"]}],
+        })
+        plan = import_hjson(path)
+        assert set(plan.testpoints[0].tests) == {"9600_test", "115200_test"}
+
+    def test_file_subs_override_caller_subs(self, tmp_path):
+        # File says "name": "spi"; caller passes name="uart" → file wins
+        path = _write_hjson(tmp_path, {
+            "name": "spi",
+            "testpoints": [{"name": "tp", "stage": "V1",
+                             "tests": ["{name}_smoke"]}],
+        })
+        plan = import_hjson(path, substitutions={"name": "uart"})
+        assert plan.testpoints[0].tests == ["spi_smoke"]
+
+    def test_caller_subs_fill_unknown_keys(self, tmp_path):
+        # File doesn't define "baud"; caller does
+        path = _write_hjson(tmp_path, {
+            "testpoints": [{"name": "tp", "stage": "V1",
+                             "tests": ["{baud}_test"]}],
+        })
+        plan = import_hjson(path, substitutions={"baud": "9600"})
+        assert plan.testpoints[0].tests == ["9600_test"]
+
+    def test_plan_name_stored(self, tmp_path):
+        path = _write_hjson(tmp_path, {"name": "uart", "testpoints": []})
+        plan = import_hjson(path)
+        assert plan.name == "uart"
+
+
+# ── requirements parsing ──────────────────────────────────────────────────────
+
+class TestRequirementsPreserved:
+    def test_requirements_parsed(self, tmp_path):
+        path = _write_hjson(tmp_path, {
+            "testpoints": [
+                {"name": "tp", "stage": "V1", "tests": ["t"],
+                 "requirements": [
+                     {"system": "JIRA", "project": "UART",
+                      "item_id": "REQ-42", "url": "http://jira/42"},
+                 ]},
+            ],
+        })
+        plan = import_hjson(path)
+        tp = plan.testpoints[0]
+        assert len(tp.requirements) == 1
+        req = tp.requirements[0]
+        assert req.system == "JIRA"
+        assert req.item_id == "REQ-42"
+        assert req.url == "http://jira/42"
+
+    def test_multiple_requirements(self, tmp_path):
+        path = _write_hjson(tmp_path, {
+            "testpoints": [
+                {"name": "tp", "stage": "V1", "tests": ["t"],
+                 "requirements": [
+                     {"system": "JIRA", "item_id": "REQ-1"},
+                     {"system": "ALM",  "item_id": "REQ-2"},
+                 ]},
+            ],
+        })
+        plan = import_hjson(path)
+        assert len(plan.testpoints[0].requirements) == 2
+
+    def test_empty_requirements_allowed(self, tmp_path):
+        path = _write_hjson(tmp_path, {
+            "testpoints": [{"name": "tp", "stage": "V1", "tests": ["t"]}],
+        })
+        plan = import_hjson(path)
+        assert plan.testpoints[0].requirements == []
+
+    def test_na_testpoint_with_requirements(self, tmp_path):
+        path = _write_hjson(tmp_path, {
+            "testpoints": [
+                {"name": "tp", "stage": "V1", "tests": ["N/A"],
+                 "requirements": [{"system": "JIRA", "item_id": "REQ-99"}]},
+            ],
+        })
+        plan = import_hjson(path)
+        tp = plan.testpoints[0]
+        assert tp.na is True
+        assert len(tp.requirements) == 1

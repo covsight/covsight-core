@@ -5,3 +5,4 @@ File Formats
    :maxdepth: 2
 
    ncdb
+   testplan

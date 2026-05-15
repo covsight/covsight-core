@@ -12,9 +12,9 @@ license = "Apache-2.0"
 authors = [
   { name = "CovSight Contributors" },
 ]
-dependencies = []
-# NOTE: covsight-core has ZERO runtime dependencies.
-# The NCDB C accelerator is optional and built via cffi at install time.
+dependencies = [
+  "pyyaml>=5.1",
+]
 
 [project.urls]
 Homepage = "https://github.com/covsight/covsight-core"
@@ -24,6 +24,8 @@ Issues = "https://github.com/covsight/covsight-core/issues"
 [project.optional-dependencies]
 accel = ["cffi>=1.15"]
 dev = ["pytest>=7.0", "pytest-cov"]
+validate = ["jsonschema>=4.0"]
+hjson = ["hjson>=3.0"]
 
 [project.entry-points."covsight.formats.db"]
 ncdb = "covsight.core.ncdb.format_plugin:NcdbFormatPlugin"

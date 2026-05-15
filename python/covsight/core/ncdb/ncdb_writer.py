@@ -27,6 +27,7 @@ from .constants import (
     MEMBER_ATTRS, MEMBER_TAGS, MEMBER_PROPERTIES, MEMBER_TOGGLE, MEMBER_FSM,
     MEMBER_CROSS, MEMBER_DESIGN_UNITS, MEMBER_FORMAL,
     MEMBER_COVERITEM_FLAGS, MEMBER_TESTPLAN, MEMBER_WAIVERS,
+    MEMBER_ISSUES, MEMBER_ISSUES_META, MEMBER_ISSUES_HISTORY,
     HISTORY_FORMAT_V2,
 )
 
@@ -140,3 +141,16 @@ class NcdbWriter:
             waivers = getattr(db, '_waivers', None)
             if waivers is not None:
                 zf.writestr(MEMBER_WAIVERS, waivers.serialize())
+            # Issues (optional — only write if dirty)
+            issues = getattr(db, '_issues', None)
+            if issues is not None and getattr(db, '_issues_dirty', False):
+                zf.writestr(MEMBER_ISSUES, issues.serialize())
+            # Issues meta (optional — only write if dirty)
+            issues_meta = getattr(db, '_issues_meta', None)
+            if issues_meta is not None and getattr(db, '_issues_meta_dirty', False):
+                zf.writestr(MEMBER_ISSUES_META, issues_meta.serialize())
+            # Issues history (optional — only write if dirty)
+            issues_history_raw = getattr(db, '_issues_history_raw', b'')
+            if issues_history_raw and getattr(db, '_issues_history_dirty', False):
+                zf.writestr(MEMBER_ISSUES_HISTORY, issues_history_raw,
+                            compress_type=zipfile.ZIP_STORED)

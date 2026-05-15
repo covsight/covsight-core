@@ -11,6 +11,7 @@ typedef struct ncdb_s *ncdbT;
 typedef struct ncdb_scope_s *ncdbScopeT;
 typedef struct ncdb_cover_s *ncdbCoverT;
 typedef struct ncdb_history_node_s *ncdbHistoryNodeT;
+typedef struct ncdb_issue_s *ncdbIssueT;
 
 enum {
     NCDB_SCOPE_TOGGLE            = 0x0000000000000001ULL,
@@ -97,6 +98,43 @@ enum {
     NCDB_HISTORY_ALL = 0,
     NCDB_HISTORY_TEST = 1,
     NCDB_HISTORY_MERGE = 2
+};
+
+enum {
+    NCDB_ISSUE_SEV_INFO     = 0,
+    NCDB_ISSUE_SEV_LOW      = 1,
+    NCDB_ISSUE_SEV_MEDIUM   = 2,
+    NCDB_ISSUE_SEV_HIGH     = 3,
+    NCDB_ISSUE_SEV_CRITICAL = 4
+};
+
+enum {
+    NCDB_ISSUE_KIND_DESIGN_BUG = 0,
+    NCDB_ISSUE_KIND_TEST_BUG   = 1,
+    NCDB_ISSUE_KIND_INFRA      = 2,
+    NCDB_ISSUE_KIND_SPEC_GAP   = 3
+};
+
+enum {
+    NCDB_ISSUE_STATE_OPEN        = 0,
+    NCDB_ISSUE_STATE_IN_PROGRESS = 1,
+    NCDB_ISSUE_STATE_RESOLVED    = 2,
+    NCDB_ISSUE_STATE_CLOSED      = 3,
+    NCDB_ISSUE_STATE_WONTFIX     = 4
+};
+
+enum {
+    NCDB_ISSUE_RES_NONE       = 0,
+    NCDB_ISSUE_RES_FIXED      = 1,
+    NCDB_ISSUE_RES_WONT_FIX   = 2,
+    NCDB_ISSUE_RES_DUPLICATE  = 3,
+    NCDB_ISSUE_RES_NOT_A_BUG  = 4
+};
+
+enum {
+    NCDB_LINK_BLOCKED_BY = 0,
+    NCDB_LINK_CAUSED_BY  = 1,
+    NCDB_LINK_RELATED    = 2
 };
 
 #ifdef __cplusplus

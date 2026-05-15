@@ -43,10 +43,14 @@ export class StringTable {
   }
 
   static read(buf: Uint8Array): StringTable {
+    return StringTable.readFrom(buf, 0).table;
+  }
+
+  static readFrom(buf: Uint8Array, startOffset: number): { table: StringTable; bytesRead: number } {
     const table = new StringTable();
     table.strings.length = 0;
     table.index.clear();
-    let offset = 0;
+    let offset = startOffset;
     const countResult = readVarint(buf, offset);
     const count = Number(countResult.value);
     offset += countResult.bytesRead;
@@ -58,7 +62,7 @@ export class StringTable {
       table.intern(decoder.decode(buf.slice(offset, end)));
       offset = end;
     }
-    return table;
+    return { table, bytesRead: offset - startOffset };
   }
 }
 

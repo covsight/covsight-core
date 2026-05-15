@@ -36,6 +36,14 @@ from covsight.core.mem.mem_ucis import MemUCIS  # noqa: E402
 from covsight.core.ncdb.ncdb_writer import NcdbWriter  # noqa: E402
 from covsight.core.ncdb.ncdb_reader import NcdbReader  # noqa: E402
 from covsight.core.api.source_info import SourceInfo  # noqa: E402
+from covsight.core.ncdb.issues import (  # noqa: E402
+    IssueSet, IssueSpec,
+    SEV_HIGH, SEV_LOW, SEV_MEDIUM, SEV_CRITICAL,
+    KIND_DESIGN_BUG, KIND_TEST_BUG,
+    STATE_OPEN, STATE_IN_PROGRESS, STATE_RESOLVED, STATE_CLOSED,
+    RES_NONE, RES_FIXED, RES_WONT_FIX,
+    LINK_BLOCKED_BY, LINK_CAUSED_BY, LINK_RELATED,
+)
 
 # ---------------------------------------------------------------------------
 # Scenario builders — Python reference implementations
@@ -152,26 +160,107 @@ def scenario_weight_goal(db: MemUCIS) -> None:
     cp.createBin("b0", None, 1, 1, "", CoverTypeT.CVGBIN)
 
 
+def scenario_issues_minimal(db: MemUCIS) -> None:
+    """2 issues, no history, no IssuesMeta."""
+    issues = IssueSet()
+    issues.add_issue(IssueSpec(
+        id="I-001", ext="EXT-1",
+        severity=SEV_HIGH, kind=KIND_DESIGN_BUG,
+        state=STATE_OPEN, resolution=RES_NONE,
+        created_at=1000, updated_at=1000, synced_at=0,
+    ))
+    issues.add_issue(IssueSpec(
+        id="I-002", ext="",
+        severity=SEV_LOW, kind=KIND_TEST_BUG,
+        state=STATE_CLOSED, resolution=RES_FIXED,
+        created_at=2000, updated_at=2001, synced_at=0,
+    ))
+    issues.add_waiver_link(waiver_id="W-001", issue_id="I-001")
+    db._issues = issues
+    db._issues_dirty = True
+
+
+def scenario_issues_full(db: MemUCIS) -> None:
+    """4 issues, all link types, IssuesMeta with some nulls, plus coverage data."""
+    from covsight.core.ncdb.issues_meta import IssuesMeta
+    # Add some coverage data alongside the issues
+    cg = db.createScope("cg_iss", None, 1, None, ScopeTypeT.COVERGROUP, 0)
+    cp = cg.createCoverpoint("cp0", None, 1, None)
+    cp.createBin("b0", None, 1, 5, "", CoverTypeT.CVGBIN)
+
+    issues = IssueSet()
+    h1 = issues.add_issue(IssueSpec(
+        id="I-001", ext="BUG-42",
+        severity=SEV_CRITICAL,
+        kind=KIND_DESIGN_BUG,
+        state=STATE_IN_PROGRESS, resolution=RES_NONE,
+        created_at=1000, updated_at=1100, synced_at=0,
+    ))
+    h2 = issues.add_issue(IssueSpec(
+        id="I-002", ext="",
+        severity=SEV_MEDIUM, kind=KIND_TEST_BUG,
+        state=STATE_RESOLVED, resolution=RES_FIXED,
+        created_at=2000, updated_at=2500, synced_at=0,
+    ))
+    issues.add_issue(IssueSpec(
+        id="I-003", ext="SPEC-7",
+        severity=SEV_LOW, kind=KIND_TEST_BUG,
+        state=STATE_OPEN, resolution=RES_NONE,
+        created_at=3000, updated_at=3000, synced_at=0,
+    ))
+    h4 = issues.add_issue(IssueSpec(
+        id="I-004", ext="",
+        severity=SEV_HIGH, kind=KIND_DESIGN_BUG,
+        state=STATE_CLOSED, resolution=RES_WONT_FIX,
+        created_at=4000, updated_at=4100, synced_at=0,
+    ))
+    issues.add_waiver_link(waiver_id="W-001", issue_id="I-001")
+    issues.add_waiver_link(waiver_id="W-002", issue_id="I-003")
+    issues.add_testpoint_link(tp_name="tp_smoke", issue_id="I-002", link_type=LINK_BLOCKED_BY)
+    issues.add_testpoint_link(tp_name="tp_reg",   issue_id="I-004", link_type=LINK_CAUSED_BY)
+    issues.add_coverage_link(scope_path="cg_iss", bin_name="b0",
+                             issue_id="I-001", link_type=LINK_RELATED)
+    db._issues = issues
+    db._issues_dirty = True
+
+    meta = IssuesMeta()
+    meta.set_title(h1, "Critical design bug in arbiter")
+    meta.set_url(h1,   "https://bugs.example.com/42")
+    meta.set_title(h2, "Test flakiness in smoke suite")
+    # h3 intentionally no meta (null entry)
+    meta.set_title(h4, "Won't fix \u2014 by design")
+    db._issues_meta = meta
+    db._issues_meta_dirty = True
+
+
 SCENARIO_FNS = {
-    "empty":         scenario_empty,
-    "minimal":       scenario_minimal,
-    "basic":         scenario_basic,
-    "at_least":      scenario_at_least,
-    "toggle":        scenario_toggle,
-    "source_info":   scenario_source_info,
-    "history":       scenario_history,
-    "cross":         scenario_cross,
-    "deep":          scenario_deep,
-    "full":          scenario_full,
-    "unicode_names": scenario_unicode_names,
-    "large_count":   scenario_large_count,
-    "weight_goal":   scenario_weight_goal,
+    "empty":           scenario_empty,
+    "minimal":         scenario_minimal,
+    "basic":           scenario_basic,
+    "at_least":        scenario_at_least,
+    "toggle":          scenario_toggle,
+    "source_info":     scenario_source_info,
+    "history":         scenario_history,
+    "cross":           scenario_cross,
+    "deep":            scenario_deep,
+    "full":            scenario_full,
+    "unicode_names":   scenario_unicode_names,
+    "large_count":     scenario_large_count,
+    "weight_goal":     scenario_weight_goal,
+    "issues_minimal":  scenario_issues_minimal,
+    "issues_full":     scenario_issues_full,
 }
 
-#: Scenarios supported by all three implementations
+#: All scenario names (base + issues)
 SCENARIOS_ALL = list(SCENARIO_FNS.keys())
-#: Scenarios where C writer can fully participate (now includes source_info)
-SCENARIOS_C = SCENARIOS_ALL
+#: Base scenarios (no issue tracking) — supported by all three writers
+SCENARIOS_BASE = [s for s in SCENARIOS_ALL if not s.startswith("issues_")]
+#: Scenarios where C writer can fully participate
+SCENARIOS_C = SCENARIOS_BASE
+#: Issue scenarios — Python and TypeScript can write; all three can read
+SCENARIOS_ISSUES = ["issues_minimal", "issues_full"]
+#: Issue scenario writers (C cannot write issues)
+SCENARIOS_ISSUES_WRITERS = ["python", "typescript"]
 
 # ---------------------------------------------------------------------------
 # Helpers: canonical JSON dump
@@ -238,7 +327,47 @@ def db_to_dict(db: MemUCIS) -> dict:
             "tool_category": node.getToolCategory(),
             "comment":       node.getComment(),
         })
-    return {"format": "ncdb-dump-v1", "history": history, "scopes": scopes}
+    result = {"format": "ncdb-dump-v1", "history": history, "scopes": scopes}
+
+    issues_set = getattr(db, '_issues', None)
+    if issues_set is None and hasattr(db, 'getIssues'):
+        issues_set = db.getIssues()
+    issues_list = []
+    waiver_links = []
+    tp_links = []
+    cov_links = []
+    if issues_set is not None:
+        for handle in issues_set.issues():
+            issues_list.append({
+                "id":         handle.id,
+                "ext":        handle.ext,
+                "severity":   handle.severity,
+                "kind":       handle.kind,
+                "state":      handle.state,
+                "resolution": handle.resolution,
+            })
+            for lk in issues_set.waivers_for_issue(handle):
+                waiver_links.append({
+                    "waiver_id": lk.waiver_id,
+                    "issue_id":  lk.issue_id,
+                })
+            for lk in issues_set.testpoints_for_issue(handle):
+                tp_links.append({
+                    "tp_name":   lk.testpoint_name,
+                    "issue_id":  lk.issue_id,
+                    "link_type": lk.link_type,
+                })
+        cov_links = [
+            {"scope_path": lk.scope_path, "bin_name": lk.bin_name,
+             "issue_id": lk.issue_id, "link_type": lk.link_type}
+            for lk in issues_set.coverage_links()
+        ]
+    result["issues"] = issues_list
+    result["waiver_links"] = waiver_links
+    result["testpoint_links"] = tp_links
+    result["coverage_links"] = cov_links
+
+    return result
 
 # ---------------------------------------------------------------------------
 # Session fixtures

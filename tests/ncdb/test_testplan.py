@@ -6,11 +6,16 @@ import json
 import pytest
 
 from covsight.core.ncdb.testplan import (
+    CoverageBinding,
     CovergroupEntry,
+    CoverpointEntry,
+    Goal,
+    ImportEntry,
     RequirementLink,
     Testplan,
     Testpoint,
     get_testplan,
+    iter_testpoints,
     set_testplan,
 )
 
@@ -226,3 +231,339 @@ class TestModuleHelpers:
     def test_set_testplan_raises_without_method(self):
         with pytest.raises(TypeError):
             set_testplan(object(), "plan")
+
+
+# ── Goal ──────────────────────────────────────────────────────────────────────
+
+class TestGoal:
+    def test_default_fields(self):
+        g = Goal()
+        assert g.id == ""
+        assert g.title == ""
+        assert g.goals == []
+        assert g.testpoints == []
+        assert g.custom == {}
+
+    def test_nested_goals(self):
+        child = Goal(id="child", title="Child goal")
+        parent = Goal(id="parent", title="Parent", goals=[child])
+        assert len(parent.goals) == 1
+        assert parent.goals[0].id == "child"
+
+    def test_goal_serialisation_round_trip(self):
+        g = Goal(
+            id="functional",
+            title="Functional verification",
+            desc="Verify all functional paths",
+            owner="alice",
+            priority="high",
+            status="in_progress",
+            tags=["nightly"],
+            custom={"jira_epic": "UART-10"},
+            testpoints=[Testpoint(name="uart_reset", stage="V1")],
+            goals=[Goal(id="sub", title="Sub-goal")],
+        )
+        plan = Testplan(goals=[g])
+        d = plan.to_dict()
+        plan2 = Testplan.from_dict(d)
+        g2 = plan2.goals[0]
+        assert g2.id == "functional"
+        assert g2.owner == "alice"
+        assert g2.priority == "high"
+        assert g2.status == "in_progress"
+        assert g2.tags == ["nightly"]
+        assert g2.custom == {"jira_epic": "UART-10"}
+        assert len(g2.testpoints) == 1
+        assert g2.testpoints[0].name == "uart_reset"
+        assert len(g2.goals) == 1
+        assert g2.goals[0].id == "sub"
+
+    def test_deeply_nested_goals_serialise(self):
+        deep = Goal(id="leaf", testpoints=[Testpoint(name="tp_leaf", stage="V3")])
+        mid = Goal(id="mid", goals=[deep])
+        top = Goal(id="top", goals=[mid])
+        plan = Testplan(goals=[top])
+        d = plan.to_dict()
+        plan2 = Testplan.from_dict(d)
+        leaf_tp = plan2.goals[0].goals[0].goals[0].testpoints[0]
+        assert leaf_tp.name == "tp_leaf"
+
+
+# ── CoverageBinding ───────────────────────────────────────────────────────────
+
+class TestCoverageBinding:
+    def test_all_nine_types_accepted(self):
+        for t in CoverageBinding.TYPES:
+            b = CoverageBinding(type=t, path="a.b.c")
+            assert b.type == t
+
+    def test_round_trip(self):
+        tp = Testpoint(
+            name="tp", stage="V1",
+            coverage=[
+                CoverageBinding(type="covergroup",  path="env.cg",    desc="main cg"),
+                CoverageBinding(type="coverpoint",  path="env.cg.cp"),
+                CoverageBinding(type="toggle",      path="tb.sig"),
+                CoverageBinding(type="assertion",   path="tb.chk_err"),
+                CoverageBinding(type="line",        path="dut.c:42"),
+            ],
+        )
+        plan = Testplan(testpoints=[tp])
+        plan2 = Testplan.from_dict(plan.to_dict())
+        bindings = plan2.testpoints[0].coverage
+        assert len(bindings) == 5
+        assert bindings[0].type == "covergroup"
+        assert bindings[0].path == "env.cg"
+        assert bindings[0].desc == "main cg"
+        assert bindings[1].type == "coverpoint"
+        assert bindings[2].type == "toggle"
+
+    def test_glob_path_round_trips(self):
+        b = CoverageBinding(type="covergroup", path="env.*.cg")
+        plan = Testplan(testpoints=[Testpoint(name="tp", stage="V1", coverage=[b])])
+        plan2 = Testplan.from_dict(plan.to_dict())
+        assert plan2.testpoints[0].coverage[0].path == "env.*.cg"
+
+
+# ── Plan metadata ─────────────────────────────────────────────────────────────
+
+class TestPlanMetadata:
+    def test_name_owner_description_tags(self):
+        plan = Testplan(
+            name="uart",
+            description="UART block verification",
+            owner="dv-team",
+            tags=["regression", "block"],
+            schema="https://schema.covsight.io/testplan/v1",
+        )
+        d = plan.to_dict()
+        assert d["name"] == "uart"
+        assert d["description"] == "UART block verification"
+        assert d["owner"] == "dv-team"
+        assert d["tags"] == ["regression", "block"]
+        assert d["schema"] == "https://schema.covsight.io/testplan/v1"
+
+    def test_substitutions_round_trip(self):
+        plan = Testplan(substitutions={"name": "uart", "baud": ["9600", "115200"]})
+        plan2 = Testplan.from_dict(plan.to_dict())
+        assert plan2.substitutions["name"] == "uart"
+        assert plan2.substitutions["baud"] == ["9600", "115200"]
+
+    def test_imports_round_trip(self):
+        plan = Testplan(imports=[
+            ImportEntry(path="common/csr.yaml", substitutions={"name": "uart"}),
+        ])
+        plan2 = Testplan.from_dict(plan.to_dict())
+        assert len(plan2.imports) == 1
+        assert plan2.imports[0].path == "common/csr.yaml"
+        assert plan2.imports[0].substitutions == {"name": "uart"}
+
+    def test_custom_round_trip(self):
+        plan = Testplan(custom={"acme": {"priority": 1, "dv_doc": "http://x"}})
+        plan2 = Testplan.from_dict(plan.to_dict())
+        assert plan2.custom["acme"]["priority"] == 1
+
+    def test_backward_compat_old_dict(self):
+        # Dict from old serialiser: no new fields present
+        old = {
+            "format_version": 1,
+            "source_file": "old.hjson",
+            "import_timestamp": "2024-01-01T00:00:00+00:00",
+            "testpoints": [{"name": "tp", "stage": "V1"}],
+            "covergroups": [{"name": "cg", "desc": ""}],
+        }
+        plan = Testplan.from_dict(old)
+        assert plan.name == ""
+        assert plan.goals == []
+        assert plan.substitutions == {}
+        assert len(plan.testpoints) == 1
+        assert len(plan.covergroups) == 1
+
+
+# ── Extended Testpoint fields ──────────────────────────────────────────────────
+
+class TestTestpointExtendedFields:
+    def test_owner_priority_weight(self):
+        tp = Testpoint(name="tp", stage="V1",
+                       owner="bob", priority="high", weight=3)
+        plan = Testplan(testpoints=[tp])
+        plan2 = Testplan.from_dict(plan.to_dict())
+        tp2 = plan2.testpoints[0]
+        assert tp2.owner == "bob"
+        assert tp2.priority == "high"
+        assert tp2.weight == 3
+
+    def test_custom_on_testpoint(self):
+        tp = Testpoint(name="tp", stage="V1",
+                       custom={"acme": {"sim_time": 300}})
+        plan = Testplan(testpoints=[tp])
+        plan2 = Testplan.from_dict(plan.to_dict())
+        assert plan2.testpoints[0].custom == {"acme": {"sim_time": 300}}
+
+    def test_weight_defaults_to_1(self):
+        tp = Testpoint(name="tp", stage="V1")
+        assert tp.weight == 1
+
+    def test_from_dict_weight_missing_defaults_to_1(self):
+        d = {"testpoints": [{"name": "tp", "stage": "V1"}]}
+        plan = Testplan.from_dict(d)
+        assert plan.testpoints[0].weight == 1
+
+
+# ── CovergroupEntry extensions ────────────────────────────────────────────────
+
+class TestCovergroupEntryExtended:
+    def test_coverpoints_round_trip(self):
+        cg = CovergroupEntry(
+            name="uart_cg",
+            desc="UART functional coverage",
+            coverpoints=[
+                CoverpointEntry(name="baud_rate_cp",
+                                desc="Baud rate divisor",
+                                path="env.uart_cg.baud_rate_cp"),
+                CoverpointEntry(name="parity_cp",
+                                path="env.uart_cg.parity_cp"),
+            ],
+            custom={"acme": {"review": "done"}},
+        )
+        plan = Testplan(covergroups=[cg])
+        plan2 = Testplan.from_dict(plan.to_dict())
+        cg2 = plan2.covergroups[0]
+        assert cg2.name == "uart_cg"
+        assert len(cg2.coverpoints) == 2
+        assert cg2.coverpoints[0].name == "baud_rate_cp"
+        assert cg2.coverpoints[0].path == "env.uart_cg.baud_rate_cp"
+        assert cg2.custom == {"acme": {"review": "done"}}
+
+    def test_coverpoints_default_empty(self):
+        cg = CovergroupEntry(name="cg")
+        assert cg.coverpoints == []
+        assert cg.custom == {}
+
+
+# ── iter_testpoints ───────────────────────────────────────────────────────────
+
+class TestIterTestpoints:
+    def test_top_level_only(self):
+        plan = _make_plan()
+        names = [tp.name for tp in iter_testpoints(plan)]
+        assert names == ["uart_reset", "uart_loopback", "uart_na"]
+
+    def test_goals_only(self):
+        plan = Testplan(goals=[
+            Goal(testpoints=[Testpoint(name="g1_tp", stage="V1")]),
+            Goal(testpoints=[Testpoint(name="g2_tp", stage="V2")]),
+        ])
+        names = [tp.name for tp in iter_testpoints(plan)]
+        assert names == ["g1_tp", "g2_tp"]
+
+    def test_mixed_top_level_and_goals(self):
+        plan = Testplan(
+            testpoints=[Testpoint(name="top", stage="V1")],
+            goals=[Goal(testpoints=[Testpoint(name="nested", stage="V2")])],
+        )
+        names = [tp.name for tp in iter_testpoints(plan)]
+        assert names == ["top", "nested"]
+
+    def test_deeply_nested(self):
+        plan = Testplan(goals=[
+            Goal(goals=[
+                Goal(goals=[
+                    Goal(testpoints=[Testpoint(name="deep", stage="V3")]),
+                ]),
+            ]),
+        ])
+        names = [tp.name for tp in iter_testpoints(plan)]
+        assert names == ["deep"]
+
+    def test_empty_plan_yields_nothing(self):
+        assert list(iter_testpoints(Testplan())) == []
+
+    def test_stage_search_includes_goal_testpoints(self):
+        plan = Testplan(
+            testpoints=[Testpoint(name="top_v1", stage="V1")],
+            goals=[Goal(testpoints=[Testpoint(name="nested_v2", stage="V2")])],
+        )
+        v2 = plan.testpointsForStage("V2")
+        assert len(v2) == 1
+        assert v2[0].name == "nested_v2"
+
+    def test_index_covers_goal_testpoints(self):
+        plan = Testplan(goals=[
+            Goal(testpoints=[Testpoint(name="g_tp", stage="V1",
+                                       tests=["g_test"])]),
+        ])
+        tp = plan.getTestpoint("g_tp")
+        assert tp is not None
+        tp2 = plan.testpointForTest("g_test")
+        assert tp2 is not None and tp2.name == "g_tp"
+
+
+# ── Full extended round-trip ──────────────────────────────────────────────────
+
+class TestFullRoundTrip:
+    def test_all_fields_preserved(self):
+        plan = Testplan(
+            name="uart",
+            description="UART block verification",
+            owner="dv-team",
+            tags=["regression"],
+            schema="https://schema.covsight.io/testplan/v1",
+            substitutions={"name": "uart"},
+            imports=[ImportEntry(path="common/csr.yaml",
+                                 substitutions={"name": "uart"})],
+            source_file="uart.yaml",
+            import_timestamp="2024-06-01T00:00:00+00:00",
+            custom={"acme": {"block": "uart"}},
+        )
+        plan.testpoints.append(Testpoint(
+            name="uart_reset", stage="V1",
+            coverage=[CoverageBinding(type="covergroup",
+                                      path="env.uart_reset_cg")],
+            requirements=[RequirementLink(system="JIRA", project="UART",
+                                          item_id="REQ-1")],
+            owner="alice", priority="high", weight=2,
+            custom={"acme": {"sim_time": 60}},
+        ))
+        plan.goals.append(Goal(
+            id="functional", title="Functional",
+            status="planned",
+            testpoints=[Testpoint(
+                name="uart_baud", stage="V2",
+                coverage=[CoverageBinding(type="coverpoint",
+                                          path="env.cg.baud_cp")],
+            )],
+            goals=[Goal(id="sub", title="Sub")],
+            custom={"jira": "UART-10"},
+        ))
+        plan.covergroups.append(CovergroupEntry(
+            name="uart_cg",
+            coverpoints=[CoverpointEntry(name="baud_cp",
+                                         path="env.uart_cg.baud_cp")],
+        ))
+
+        data = plan.serialize()
+        plan2 = Testplan.from_bytes(data)
+
+        assert plan2.name == "uart"
+        assert plan2.owner == "dv-team"
+        assert plan2.custom == {"acme": {"block": "uart"}}
+        assert len(plan2.imports) == 1
+        assert plan2.imports[0].path == "common/csr.yaml"
+
+        tp = plan2.testpoints[0]
+        assert tp.name == "uart_reset"
+        assert tp.owner == "alice"
+        assert tp.weight == 2
+        assert tp.coverage[0].type == "covergroup"
+        assert tp.requirements[0].item_id == "REQ-1"
+
+        g = plan2.goals[0]
+        assert g.id == "functional"
+        assert g.status == "planned"
+        assert g.testpoints[0].name == "uart_baud"
+        assert g.goals[0].id == "sub"
+        assert g.custom == {"jira": "UART-10"}
+
+        cg = plan2.covergroups[0]
+        assert cg.coverpoints[0].name == "baud_cp"

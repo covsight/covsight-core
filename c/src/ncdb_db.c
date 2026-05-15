@@ -3,6 +3,7 @@
 
 #include "ncdb_impl.h"
 #include "ncdb_cross.h"
+#include "ncdb_issues.h"
 
 static void free_scope(ncdbScopeT scope) {
     size_t i;
@@ -104,6 +105,8 @@ void ncdb_impl_reset_db(ncdbT db) {
     free(db->roots); db->roots = NULL; db->root_count = db->root_cap = 0;
     free(db->history_nodes); db->history_nodes = NULL; db->history_count = db->history_cap = 0;
     free(db->sources); db->sources = NULL; db->source_count = db->source_cap = 0;
+    ncdb_issues_free(db->issues); db->issues = NULL;
+    free(db->issues_hist_data); db->issues_hist_data = NULL; db->issues_hist_len = 0;
 }
 
 static int append_ptr(void ***arr, size_t *count, size_t *cap, void *item) {
@@ -291,6 +294,29 @@ int ncdb_Read(ncdbT db, const char *path) {
     if (ncdb_zip_read_member(path, NCDB_MEMBER_TOGGLE, &toggle_b, &toggle_sz, err, sizeof(err)) == 0) ncdb_toggle_deserialize(db, toggle_b, toggle_sz, err, sizeof(err));
     if (ncdb_zip_read_member(path, NCDB_MEMBER_CROSS, &cross_b, &cross_sz, err, sizeof(err)) == 0) ncdb_cross_deserialize(db, cross_b, cross_sz, err, sizeof(err));
     if (ncdb_zip_read_member(path, NCDB_MEMBER_FSM, &fsm_b, &fsm_sz, err, sizeof(err)) == 0) ncdb_fsm_deserialize(db, fsm_b, fsm_sz, err, sizeof(err));
+    {
+        uint8_t *issues_b = NULL;
+        size_t issues_sz = 0;
+        if (ncdb_zip_read_member(path, NCDB_MEMBER_ISSUES, &issues_b, &issues_sz, err, sizeof(err)) == 0) {
+            ncdb_issues_free(db->issues);
+            db->issues = NULL;
+            if (ncdb_issues_parse(&db->issues, issues_b, issues_sz, err, sizeof(err)) != 0) {
+                db->issues = NULL;
+            }
+            free(issues_b);
+        }
+        free(db->issues_hist_data);
+        db->issues_hist_data = NULL;
+        db->issues_hist_len = 0;
+        {
+            uint8_t *hist_b = NULL;
+            size_t hist_sz = 0;
+            if (ncdb_zip_read_member(path, NCDB_MEMBER_ISSUES_HISTORY, &hist_b, &hist_sz, err, sizeof(err)) == 0) {
+                db->issues_hist_data = hist_b;
+                db->issues_hist_len = hist_sz;
+            }
+        }
+    }
     rc = 0;
 cleanup_manifest:
     ncdb_strings_free(&strings);

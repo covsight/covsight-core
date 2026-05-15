@@ -50,6 +50,9 @@ MEMBER_CONTRIB_INDEX  = "contrib_index.bin"
 MEMBER_SQUASH_LOG     = "squash_log.bin"
 MEMBER_TESTPLAN       = "testplan.json"
 MEMBER_WAIVERS        = "waivers.json"
+MEMBER_ISSUES         = "issues.bin"
+MEMBER_ISSUES_META    = "issues_meta.json"
+MEMBER_ISSUES_HISTORY = "issues_history.bin"
 
 # ── v2 history bucket directory prefix ────────────────────────────────────
 

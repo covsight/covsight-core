@@ -1,0 +1,31 @@
+{
+  "coverage_links": [],
+  "format": "ncdb-dump-v1",
+  "history": [],
+  "issues": [
+    {
+      "ext": "EXT-1",
+      "id": "I-001",
+      "kind": 0,
+      "resolution": 0,
+      "severity": 3,
+      "state": 0
+    },
+    {
+      "ext": "",
+      "id": "I-002",
+      "kind": 1,
+      "resolution": 1,
+      "severity": 1,
+      "state": 3
+    }
+  ],
+  "scopes": [],
+  "testpoint_links": [],
+  "waiver_links": [
+    {
+      "issue_id": "I-001",
+      "waiver_id": "W-001"
+    }
+  ]
+}

@@ -6,6 +6,17 @@ list.  Each testpoint can have a ``tests`` list that uses ``{key}`` wildcards
 expanded by cartesian product with a ``substitutions`` dict.  ``tests: ["N/A"]``
 marks a testpoint as intentionally unmapped.
 
+OpenTitan-specific keys handled:
+
+* ``import_testplans`` — list of file paths to merge (resolved via
+  :func:`~covsight.core.ncdb.testplan_imports.resolve_imports`).
+* ``name`` at plan level — treated as ``substitutions.name`` (OpenTitan
+  convention where the plan file itself declares the DUT name).
+* ``substitutions`` dict — merged with the *substitutions* argument
+  (file wins on collision, same as :func:`load_testplan`).
+* ``requirements`` list on testpoints — mapped to
+  :class:`~covsight.core.ncdb.testplan.RequirementLink` objects.
+
 Falls back to standard ``json`` if the ``hjson`` package is not installed
 (works for files that happen to be valid JSON or JSON-subset Hjson).
 """
@@ -16,7 +27,8 @@ import os
 import re
 from typing import Dict, List, Optional
 
-from .testplan import CovergroupEntry, Testplan, Testpoint
+from .testplan import CovergroupEntry, RequirementLink, Testplan, Testpoint
+from .testplan_imports import resolve_imports, _parse_file
 
 try:
     import hjson as _hjson
@@ -30,60 +42,56 @@ except ImportError:
 
 def import_hjson(hjson_path: str,
                  substitutions: Optional[Dict[str, object]] = None) -> Testplan:
-    """Parse an OpenTitan-style Hjson testplan and return a :class:`~ucis.ncdb.testplan.Testplan`.
+    """Parse an OpenTitan-style Hjson testplan and return a :class:`~covsight.core.ncdb.testplan.Testplan`.
+
+    Handles OpenTitan-specific keys in addition to the base schema:
+
+    * ``import_testplans`` — list of paths to merge transitively.
+    * Plan-level ``name`` key — treated as a substitution (``{name}``).
+    * ``substitutions`` dict — merged with the *substitutions* arg.
+    * ``requirements`` list on testpoints.
 
     Args:
         hjson_path:    Path to the ``.hjson`` (or ``.json``) file.
         substitutions: Optional dict of ``{key: value_or_list}`` pairs used
-                       for wildcard expansion in test names.
+                       for wildcard expansion in test names.  The file's own
+                       ``substitutions`` dict takes precedence on collision.
 
     Returns:
-        A fully expanded :class:`~ucis.ncdb.testplan.Testplan` with all
-        ``{key}`` templates replaced.
+        A fully expanded :class:`~covsight.core.ncdb.testplan.Testplan` with
+        all ``{key}`` templates replaced and imports merged.
     """
-    subs = substitutions or {}
-    with open(hjson_path, "r", encoding="utf-8") as fh:
-        raw = fh.read()
+    abs_path = os.path.abspath(hjson_path)
+    data = _parse_file(abs_path)
 
-    if _HJSON_AVAILABLE:
-        data = _hjson.loads(raw)
-    else:
-        import json
-        data = json.loads(raw)
+    # OpenTitan convention: plan-level "name" key acts as substitutions.name
+    plan_name = data.get("name", "")
+    file_subs: dict = dict(data.get("substitutions", {}))
+    if plan_name and "name" not in file_subs:
+        file_subs["name"] = plan_name
 
-    plan = Testplan(source_file=os.path.abspath(hjson_path))
+    # Merge: caller-supplied ← file-level (file wins)
+    effective_subs = {**(substitutions or {}), **file_subs}
+
+    # Normalise OpenTitan's "import_testplans" key to the standard "imports"
+    if "import_testplans" in data and "imports" not in data:
+        data["imports"] = [{"path": p} for p in data["import_testplans"]]
+
+    # Resolve imports recursively
+    resolve_imports(data,
+                    base_dir=os.path.dirname(abs_path),
+                    resolved_paths=set(),
+                    parent_path=abs_path,
+                    _visiting={abs_path})
+
+    plan = Testplan(
+        name=plan_name,
+        substitutions=effective_subs,
+        source_file=abs_path,
+    )
 
     for rec in data.get("testpoints", []):
-        raw_tests = rec.get("tests", [])
-        if raw_tests == ["N/A"]:
-            plan.add_testpoint(Testpoint(
-                name=rec.get("name", ""),
-                stage=rec.get("stage", ""),
-                desc=rec.get("desc", ""),
-                tags=rec.get("tags", []),
-                na=True,
-                tests=[],
-                source_template="",
-            ))
-            continue
-
-        expanded: List[str] = []
-        templates: List[str] = []
-        for tmpl in raw_tests:
-            results = _expand_template(tmpl, subs)
-            expanded.extend(results)
-            if len(results) > 1 or tmpl != results[0]:
-                templates.append(tmpl)
-
-        plan.add_testpoint(Testpoint(
-            name=rec.get("name", ""),
-            stage=rec.get("stage", ""),
-            desc=rec.get("desc", ""),
-            tags=rec.get("tags", []),
-            na=False,
-            tests=expanded,
-            source_template=", ".join(templates),
-        ))
+        plan.add_testpoint(_parse_testpoint(rec, effective_subs))
 
     for rec in data.get("covergroups", []):
         plan.covergroups.append(CovergroupEntry(
@@ -92,6 +100,56 @@ def import_hjson(hjson_path: str,
         ))
 
     return plan
+
+
+# ── internal helpers ──────────────────────────────────────────────────────────
+
+def _parse_testpoint(rec: dict, subs: dict) -> Testpoint:
+    """Parse one testpoint record from an OpenTitan Hjson file."""
+    raw_tests = rec.get("tests", [])
+    if raw_tests == ["N/A"]:
+        return Testpoint(
+            name=rec.get("name", ""),
+            stage=rec.get("stage", ""),
+            desc=rec.get("desc", ""),
+            tags=rec.get("tags", []),
+            na=True,
+            tests=[],
+            source_template="",
+            requirements=_parse_requirements(rec.get("requirements", [])),
+        )
+
+    expanded: List[str] = []
+    templates: List[str] = []
+    for tmpl in raw_tests:
+        results = _expand_template(tmpl, subs)
+        expanded.extend(results)
+        if len(results) > 1 or tmpl != results[0]:
+            templates.append(tmpl)
+
+    return Testpoint(
+        name=rec.get("name", ""),
+        stage=rec.get("stage", ""),
+        desc=rec.get("desc", ""),
+        tags=rec.get("tags", []),
+        na=False,
+        tests=expanded,
+        source_template=", ".join(templates),
+        requirements=_parse_requirements(rec.get("requirements", [])),
+    )
+
+
+def _parse_requirements(raw: list) -> List[RequirementLink]:
+    return [
+        RequirementLink(
+            system=r.get("system", ""),
+            project=r.get("project", ""),
+            item_id=r.get("item_id", ""),
+            url=r.get("url", ""),
+        )
+        for r in raw
+        if isinstance(r, dict)
+    ]
 
 
 # ── internal helpers ──────────────────────────────────────────────────────────
