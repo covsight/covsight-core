@@ -12,6 +12,18 @@ for **covsight-core**.
    python-api/index
 
 .. toctree::
+   :maxdepth: 2
+   :caption: TypeScript API
+
+   typescript-api/index
+
+.. toctree::
+   :maxdepth: 2
+   :caption: C API
+
+   c-api/index
+
+.. toctree::
    :maxdepth: 1
    :caption: File Formats
 

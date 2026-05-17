@@ -18,6 +18,7 @@ extensions = [
     'sphinx.ext.intersphinx',
     'sphinx.ext.autosectionlabel',
     'sphinx.ext.inheritance_diagram',
+    'sphinx_js',
 ]
 
 intersphinx_mapping = {
@@ -37,6 +38,13 @@ version = "0.0"
 autoclass_content = "both"
 autodoc_member_order = "bysource"
 autosectionlabel_prefix_document = True
+
+# sphinx-js configuration
+js_language = 'typescript'
+js_source_path = os.path.join(rootdir, 'ts', 'src')
+jsdoc_tsconfig_path = os.path.join(rootdir, 'ts', 'tsconfig.json')
+# Tell sphinx-js where to find node_modules (typedoc lives in ts/node_modules)
+os.environ.setdefault("SPHINX_JS_NODE_MODULES", os.path.join(rootdir, 'ts', 'node_modules'))
 
 exclude_patterns = []
 pygments_style = 'sphinx'

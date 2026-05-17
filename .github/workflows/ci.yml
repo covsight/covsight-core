@@ -71,8 +71,19 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: "3.11"
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: ts/package-lock.json
+      - name: Install TypeScript dependencies
+        run: cd ts && npm ci
       - name: Install doc dependencies
         run: pip install -r docs/requirements.txt
+      - name: Patch sphinx-js BigInt bug
+        run: |
+          SPHINX_JS_PATH=$(python -c "import sphinx_js, os; print(os.path.dirname(sphinx_js.__file__))")
+          patch "$SPHINX_JS_PATH/js/convertType.ts" docs/patches/sphinx-js-bigint.patch
       - name: Build docs
         run: cd docs && make html
       - name: Upload Pages artifact

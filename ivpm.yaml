@@ -8,3 +8,11 @@ package:
       url: https://github.com/zlib-ng/minizip-ng/archive/refs/tags/4.2.1.tar.gz
     - name: cjson
       url: https://github.com/DaveGamble/cJSON/archive/refs/tags/v1.7.19.tar.gz
+    - name: sphinx-js
+      src: pypi
+      version: ">=5.0.3"
+    - name: node
+      src: package.json
+      path: ts/package.json
+
+
