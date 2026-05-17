@@ -1,4 +1,3 @@
-import { writeFile } from 'node:fs/promises';
 import JSZip from 'jszip';
 import type { MemUCIS } from '../mem/MemUCIS.js';
 import {
@@ -27,7 +26,8 @@ import { SourcesWriter } from './sourcesWriter.js';
 import { StringTable } from './stringTable.js';
 
 export class NcdbWriter {
-  async write(path: string, db: MemUCIS): Promise<void> {
+  /** Browser-safe: serialize a MemUCIS to NCDB ZIP bytes. */
+  async toBytes(db: MemUCIS): Promise<Uint8Array> {
     const strings = new StringTable();
     const { scopeTree, counts } = new ScopeTreeWriter(strings).write(db);
     const zip = new JSZip();
@@ -60,6 +60,12 @@ export class NcdbWriter {
     if (db.issueHistoryWriter) {
       zip.file(MEMBER_ISSUES_HISTORY, db.issueHistoryWriter.sealFast(), { compression: 'STORE' });
     }
-    await writeFile(path, await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE', compressionOptions: { level: 6 } }));
+    return zip.generateAsync({ type: 'uint8array', compression: 'DEFLATE', compressionOptions: { level: 6 } });
+  }
+
+  /** Node.js convenience: write a MemUCIS to a file path. Delegates to toBytes. */
+  async write(path: string, db: MemUCIS): Promise<void> {
+    const { writeFile } = await import('node:fs/promises');
+    await writeFile(path, await this.toBytes(db));
   }
 }

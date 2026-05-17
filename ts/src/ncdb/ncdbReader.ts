@@ -1,4 +1,3 @@
-import { readFile } from 'node:fs/promises';
 import JSZip from 'jszip';
 import type { MemUCIS } from '../mem/MemUCIS.js';
 import {
@@ -26,16 +25,18 @@ import { SourcesReader } from './sourcesReader.js';
 import { StringTable } from './stringTable.js';
 
 export class NcdbReader {
-  async read(path: string): Promise<MemUCIS> {
+  /** Browser-safe: create a new MemUCIS from raw NCDB ZIP bytes. */
+  async readFromBytes(data: Uint8Array): Promise<MemUCIS> {
     const { MemUCIS } = await import('../mem/MemUCIS.js');
     const db = new MemUCIS();
-    await this.readInto(path, db);
+    await this.readIntoFromBytes(data, db);
     return db;
   }
 
-  async readInto(path: string, db: MemUCIS): Promise<void> {
+  /** Browser-safe: populate an existing MemUCIS from raw NCDB ZIP bytes. */
+  async readIntoFromBytes(data: Uint8Array, db: MemUCIS): Promise<void> {
     db.reset();
-    const zip = await JSZip.loadAsync(await readFile(path));
+    const zip = await JSZip.loadAsync(data);
     const manifestEntry = zip.file(MEMBER_MANIFEST);
     if (!manifestEntry) {
       throw new Error('Missing manifest.json in NCDB file');
@@ -87,5 +88,17 @@ export class NcdbReader {
     if (historyEntry) {
       new HistoryReader().read(await historyEntry.async('string'), db);
     }
+  }
+
+  /** Node.js convenience: read from a file path. Delegates to readFromBytes. */
+  async read(path: string): Promise<MemUCIS> {
+    const { readFile } = await import('node:fs/promises');
+    return this.readFromBytes(await readFile(path));
+  }
+
+  /** Node.js convenience: populate an existing MemUCIS from a file path. Delegates to readIntoFromBytes. */
+  async readInto(path: string, db: MemUCIS): Promise<void> {
+    const { readFile } = await import('node:fs/promises');
+    return this.readIntoFromBytes(await readFile(path), db);
   }
 }
