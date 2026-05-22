@@ -19,6 +19,23 @@ add_ncdb_test(test_strings)
 add_ncdb_test(test_counts)
 add_ncdb_test(test_roundtrip)
 add_ncdb_test(test_issues)
+add_ncdb_test(test_attrs)
+add_ncdb_test(test_toggle)
+add_ncdb_test(test_fsm)
+add_ncdb_test(test_manifest_vendor)
+add_ncdb_test(test_history_tree)
+add_ncdb_test(test_tags)
+add_ncdb_test(test_du_link)
+add_ncdb_test(test_cover_fields)
+add_ncdb_test(test_covergroup)
+add_ncdb_test(test_du_files)
+
+add_executable(test_migration test_migration.c)
+target_link_libraries(test_migration PRIVATE ncdb_test_common)
+add_test(NAME test_migration COMMAND test_migration)
+set_tests_properties(test_migration PROPERTIES
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+    ENVIRONMENT "NCDB_GOLDEN_DIR=${PROJECT_SOURCE_DIR}/../tests/compat/golden")
 
 file(CONFIGURE OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/gen_issues_fixture.py CONTENT [=[
 import os, sys

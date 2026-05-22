@@ -137,6 +137,48 @@ enum {
     NCDB_LINK_RELATED    = 2
 };
 
+/* ── Typed attribute system ─────────────────────────────────────────────── */
+typedef enum {
+    NCDB_ATTR_INT32  = 1,
+    NCDB_ATTR_INT64  = 2,
+    NCDB_ATTR_FLOAT  = 3,
+    NCDB_ATTR_DOUBLE = 4,
+    NCDB_ATTR_STRING = 5,
+    NCDB_ATTR_BYTES  = 6
+} ncdbAttrType;
+
+/* ── Toggle metadata enums (UCIS-aligned) ───────────────────────────────── */
+enum {
+    NCDB_TOGGLE_METRIC_NOBINS     = 1,
+    NCDB_TOGGLE_METRIC_ENUM       = 2,
+    NCDB_TOGGLE_METRIC_TRANSITION = 3,
+    NCDB_TOGGLE_METRIC_2STOGGLE   = 4,
+    NCDB_TOGGLE_METRIC_ZTOGGLE    = 5,
+    NCDB_TOGGLE_METRIC_XTOGGLE    = 6
+};
+enum {
+    NCDB_TOGGLE_TYPE_NET = 1,
+    NCDB_TOGGLE_TYPE_REG = 2
+};
+enum {
+    NCDB_TOGGLE_DIR_INTERNAL = 1,
+    NCDB_TOGGLE_DIR_IN       = 2,
+    NCDB_TOGGLE_DIR_OUT      = 3,
+    NCDB_TOGGLE_DIR_INOUT    = 4
+};
+
+typedef struct ncdb_attr_value_s {
+    ncdbAttrType type;
+    union {
+        int32_t  i32;
+        int64_t  i64;
+        float    f32;
+        double   f64;
+        struct { const char *s; }                str;
+        struct { const void *data; size_t size; } bytes;
+    } u;
+} ncdbAttrValue;
+
 #ifdef __cplusplus
 }
 #endif

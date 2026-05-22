@@ -5,21 +5,35 @@
 #include "ncdb_cross.h"
 #include "ncdb_issues.h"
 
+static int set_owned_str(char **slot, const char *v);
+
 static void free_scope(ncdbScopeT scope) {
     size_t i;
     if (!scope) return;
     for (i = 0; i < scope->cover_count; i++) {
+        ncdb_attr_table_free(&scope->covers[i]->attrs);
         free(scope->covers[i]->name);
+        free(scope->covers[i]->source_path);
+        free(scope->covers[i]->comment);
         free(scope->covers[i]);
     }
     for (i = 0; i < scope->child_count; i++) {
         free_scope(scope->children[i]);
     }
+    ncdb_attr_table_free(&scope->attrs);
     free(scope->covers);
     free(scope->children);
     free(scope->crossed_points);  /* array only — pointed-to scopes are owned elsewhere */
     free(scope->name);
     free(scope->source_path);
+    free(scope->du_signature);
+    free(scope->expr_terms);
+    free(scope->toggle_canonical);
+    for (i = 0; i < scope->fsm_state_count; i++) free(scope->fsm_states[i].name);
+    free(scope->fsm_states);
+    for (i = 0; i < scope->tag_count; i++) free(scope->tags[i]);
+    free(scope->tags);
+    free(scope->du_files);
     free(scope);
 }
 
@@ -93,6 +107,7 @@ void ncdb_impl_reset_db(ncdbT db) {
     for (i = 0; i < db->root_count; i++) free_scope(db->roots[i]);
     for (i = 0; i < db->history_count; i++) {
         ncdbHistoryNodeT n = db->history_nodes[i];
+        ncdb_attr_table_free(&n->attrs);
         free(n->logical_name);
         free(n->physical_name);
         free(n->user_name); free(n->seed); free(n->tool_category); free(n->comment);
@@ -107,6 +122,7 @@ void ncdb_impl_reset_db(ncdbT db) {
     free(db->sources); db->sources = NULL; db->source_count = db->source_cap = 0;
     ncdb_issues_free(db->issues); db->issues = NULL;
     free(db->issues_hist_data); db->issues_hist_data = NULL; db->issues_hist_len = 0;
+    ncdb_attr_table_free(&db->attrs);
 }
 
 static int append_ptr(void ***arr, size_t *count, size_t *cap, void *item) {
@@ -148,6 +164,8 @@ ncdbCoverT ncdb_impl_create_cover(ncdbT db, ncdbScopeT scope, uint64_t type, con
     c->count = count;
     c->flags = ncdb_cover_default_flags(type);
     c->at_least = ncdb_cover_default_at_least(type);
+    c->weight = 0;
+    c->goal   = -1;
     if (!c->name) { free(c); return NULL; }
     if (append_ptr((void ***)&scope->covers, &scope->cover_count, &scope->cover_cap, c) != 0) {
         free(c->name); free(c); return NULL;
@@ -167,6 +185,7 @@ ncdbHistoryNodeT ncdb_impl_create_history(ncdbT db, uint32_t kind, const char *l
     h->sim_time    = -1.0;
     h->cpu_time    = -1.0;
     h->cost        = -1.0;
+    h->parent_idx  = (size_t)-1;
     if (append_ptr((void ***)&db->history_nodes, &db->history_count, &db->history_cap, h) != 0) {
         free(h->logical_name); free(h->physical_name); free(h); return NULL;
     }
@@ -246,8 +265,28 @@ void ncdb_Close(ncdbT db) {
     free(db->path);
     free(db->path_separator);
     free(db->last_error);
+    free(db->vendor_id);
+    free(db->vendor_tool);
+    free(db->vendor_tool_version);
+    free(db->ucis_standard);
     free(db);
 }
+
+static int set_owned_str(char **slot, const char *v) {
+    char *copy = ncdb_impl_strdup(v ? v : "");
+    if (!copy) return -1;
+    free(*slot); *slot = copy;
+    return 0;
+}
+
+int ncdb_SetVendorId         (ncdbT db, const char *v) { return db ? set_owned_str(&db->vendor_id,           v) : -1; }
+int ncdb_SetVendorTool       (ncdbT db, const char *v) { return db ? set_owned_str(&db->vendor_tool,         v) : -1; }
+int ncdb_SetVendorToolVersion(ncdbT db, const char *v) { return db ? set_owned_str(&db->vendor_tool_version, v) : -1; }
+int ncdb_SetUcisStandard     (ncdbT db, const char *v) { return db ? set_owned_str(&db->ucis_standard,       v) : -1; }
+const char *ncdb_GetVendorId         (ncdbT db) { return db ? db->vendor_id           : NULL; }
+const char *ncdb_GetVendorTool       (ncdbT db) { return db ? db->vendor_tool         : NULL; }
+const char *ncdb_GetVendorToolVersion(ncdbT db) { return db ? db->vendor_tool_version : NULL; }
+const char *ncdb_GetUcisStandard     (ncdbT db) { return db ? db->ucis_standard       : NULL; }
 
 int ncdb_Read(ncdbT db, const char *path) {
     uint8_t *manifest_b = NULL, *strings_b = NULL, *tree_b = NULL, *counts_b = NULL, *history_b = NULL, *sources_b = NULL;
@@ -282,6 +321,10 @@ int ncdb_Read(ncdbT db, const char *path) {
     }
     free(db->path_separator);
     db->path_separator = ncdb_impl_strdup(manifest.path_separator ? manifest.path_separator : "/");
+    if (manifest.vendor_id && manifest.vendor_id[0])                     set_owned_str(&db->vendor_id, manifest.vendor_id);
+    if (manifest.vendor_tool && manifest.vendor_tool[0])                 set_owned_str(&db->vendor_tool, manifest.vendor_tool);
+    if (manifest.vendor_tool_version && manifest.vendor_tool_version[0]) set_owned_str(&db->vendor_tool_version, manifest.vendor_tool_version);
+    if (manifest.ucis_standard && manifest.ucis_standard[0])             set_owned_str(&db->ucis_standard, manifest.ucis_standard);
     ncdb_strings_init(&strings);
     if (ncdb_strings_deserialize(strings_b, strings_sz, &strings, err, sizeof(err)) != 0 ||
         ncdb_counts_deserialize(counts_b, counts_sz, &counts, &count_count, err, sizeof(err)) != 0 ||
@@ -294,6 +337,12 @@ int ncdb_Read(ncdbT db, const char *path) {
     if (ncdb_zip_read_member(path, NCDB_MEMBER_TOGGLE, &toggle_b, &toggle_sz, err, sizeof(err)) == 0) ncdb_toggle_deserialize(db, toggle_b, toggle_sz, err, sizeof(err));
     if (ncdb_zip_read_member(path, NCDB_MEMBER_CROSS, &cross_b, &cross_sz, err, sizeof(err)) == 0) ncdb_cross_deserialize(db, cross_b, cross_sz, err, sizeof(err));
     if (ncdb_zip_read_member(path, NCDB_MEMBER_FSM, &fsm_b, &fsm_sz, err, sizeof(err)) == 0) ncdb_fsm_deserialize(db, fsm_b, fsm_sz, err, sizeof(err));
+    {
+        uint8_t *tags_b = NULL; size_t tags_sz = 0;
+        if (ncdb_zip_read_member(path, NCDB_MEMBER_TAGS, &tags_b, &tags_sz, err, sizeof(err)) == 0)
+            ncdb_tags_deserialize(db, tags_b, tags_sz, err, sizeof(err));
+        free(tags_b);
+    }
     {
         uint8_t *issues_b = NULL;
         size_t issues_sz = 0;
@@ -329,9 +378,9 @@ done:
 
 int ncdb_Write(ncdbT db, const char *path) {
     ncdbStringTable strings;
-    ncdbBuf tree_b, counts_tmp, counts_b, strings_b, manifest_b, history_b, sources_b, attrs_b, cross_b;
+    ncdbBuf tree_b, counts_tmp, counts_b, strings_b, manifest_b, history_b, sources_b, attrs_b, cross_b, toggle_b, fsm_b, tags_b;
     ncdbManifest manifest;
-    ncdbZipMember members[8];
+    ncdbZipMember members[14];
     size_t member_count = 0;
     uint64_t *counts = NULL;
     size_t count_count = 0;
@@ -343,6 +392,9 @@ int ncdb_Write(ncdbT db, const char *path) {
     ncdb_impl_buf_init(&tree_b); ncdb_impl_buf_init(&counts_tmp); ncdb_impl_buf_init(&counts_b);
     ncdb_impl_buf_init(&strings_b); ncdb_impl_buf_init(&manifest_b); ncdb_impl_buf_init(&history_b);
     ncdb_impl_buf_init(&sources_b); ncdb_impl_buf_init(&attrs_b); ncdb_impl_buf_init(&cross_b);
+    ncdb_impl_buf_init(&toggle_b);
+    ncdb_impl_buf_init(&fsm_b);
+    ncdb_impl_buf_init(&tags_b);
     ncdb_manifest_init(&manifest);
 
     if (ncdb_strings_add(&strings, "") < 0 ||
@@ -358,7 +410,10 @@ int ncdb_Write(ncdbT db, const char *path) {
         ncdb_strings_serialize(&strings, &strings_b) != 0 ||
         ncdb_history_serialize(db, &history_b) != 0 ||
         ncdb_sources_serialize(db, &sources_b) != 0 ||
-        ncdb_attrs_serialize_empty(&attrs_b) != 0 ||
+        ncdb_attrs_serialize(db, &attrs_b) != 0 ||
+        ncdb_toggle_serialize(db, &toggle_b) != 0 ||
+        ncdb_fsm_serialize(db, &fsm_b) != 0 ||
+        ncdb_tags_serialize(db, &tags_b) != 0 ||
         ncdb_manifest_build(db, tree_b.data, tree_b.size, counts, count_count, &manifest) != 0 ||
         ncdb_manifest_serialize(&manifest, &manifest_b) != 0) {
         ncdb_impl_set_error(db, "%s", "failed to serialize database");
@@ -371,8 +426,14 @@ int ncdb_Write(ncdbT db, const char *path) {
     members[member_count++] = (ncdbZipMember){NCDB_MEMBER_HISTORY, history_b.data, history_b.size, 0};
     members[member_count++] = (ncdbZipMember){NCDB_MEMBER_SOURCES, sources_b.data, sources_b.size, 0};
     members[member_count++] = (ncdbZipMember){NCDB_MEMBER_ATTRS, attrs_b.data, attrs_b.size, 0};
-    if (cross_rc > 0)  /* cross.bin present */
+    if (cross_rc > 0)
         members[member_count++] = (ncdbZipMember){NCDB_MEMBER_CROSS, cross_b.data, cross_b.size, 0};
+    if (toggle_b.size > 0)
+        members[member_count++] = (ncdbZipMember){NCDB_MEMBER_TOGGLE, toggle_b.data, toggle_b.size, 0};
+    if (fsm_b.size > 0)
+        members[member_count++] = (ncdbZipMember){NCDB_MEMBER_FSM, fsm_b.data, fsm_b.size, 0};
+    if (tags_b.size > 0)
+        members[member_count++] = (ncdbZipMember){NCDB_MEMBER_TAGS, tags_b.data, tags_b.size, 0};
     if (ncdb_zip_write_archive(path, members, member_count, err, sizeof(err)) != 0) {
         ncdb_impl_set_error(db, "%s", err); goto done;
     }
@@ -391,6 +452,9 @@ done:
     ncdb_impl_buf_free(&sources_b);
     ncdb_impl_buf_free(&attrs_b);
     ncdb_impl_buf_free(&cross_b);
+    ncdb_impl_buf_free(&toggle_b);
+    ncdb_impl_buf_free(&fsm_b);
+    ncdb_impl_buf_free(&tags_b);
     return rc;
 }
 
@@ -480,6 +544,19 @@ void ncdb_SetHistorySeed(ncdbT db, ncdbHistoryNodeT node, const char *v)        
 void ncdb_SetHistoryToolCategory(ncdbT db, ncdbHistoryNodeT node, const char *v){ (void)db; if (node) ncdb_impl_set_history_str(&node->tool_category, v); }
 void ncdb_SetHistoryComment(ncdbT db, ncdbHistoryNodeT node, const char *v)     { (void)db; if (node) ncdb_impl_set_history_str(&node->comment, v); }
 void ncdb_SetHistoryTestStatus(ncdbT db, ncdbHistoryNodeT node, uint32_t v)     { (void)db; if (node) node->test_status = v; }
+int ncdb_SetHistoryParent(ncdbT db, ncdbHistoryNodeT node, ncdbHistoryNodeT parent) {
+    size_t i;
+    if (!db || !node) return -1;
+    if (!parent) { node->parent_idx = (size_t)-1; return 0; }
+    for (i = 0; i < db->history_count; ++i)
+        if (db->history_nodes[i] == parent) { node->parent_idx = i; return 0; }
+    return -1;
+}
+ncdbHistoryNodeT ncdb_GetHistoryParent(ncdbT db, ncdbHistoryNodeT node) {
+    if (!db || !node || node->parent_idx == (size_t)-1 ||
+        node->parent_idx >= db->history_count) return NULL;
+    return db->history_nodes[node->parent_idx];
+}
 
 size_t     ncdb_GetCrossPointCount(ncdbT db, ncdbScopeT scope) { (void)db; return scope ? scope->crossed_count : 0; }
 ncdbScopeT ncdb_GetCrossPoint(ncdbT db, ncdbScopeT scope, size_t idx) { (void)db; return (scope && idx < scope->crossed_count) ? scope->crossed_points[idx] : NULL; }
@@ -488,4 +565,235 @@ int ncdb_impl_add_cross_point(ncdbScopeT cross_scope, ncdbScopeT cp) {
     return append_ptr((void ***)&cross_scope->crossed_points, &cross_scope->crossed_count, &cross_scope->crossed_cap, cp);
 }
 
+static void dfs_count_(ncdbScopeT s, size_t *n) {
+    size_t i;
+    if (!s) return;
+    (*n)++;
+    for (i = 0; i < s->child_count; ++i) dfs_count_(s->children[i], n);
+}
+static void dfs_collect_(ncdbScopeT s, ncdbScopeT *arr, size_t *idx) {
+    size_t i;
+    if (!s) return;
+    arr[(*idx)++] = s;
+    for (i = 0; i < s->child_count; ++i) dfs_collect_(s->children[i], arr, idx);
+}
+int ncdb_impl_dfs_flatten(ncdbT db, ncdbScopeT **out, size_t *out_count) {
+    size_t total = 0, idx = 0, i;
+    if (!db || !out || !out_count) return -1;
+    for (i = 0; i < db->root_count; ++i) dfs_count_(db->roots[i], &total);
+    *out_count = total;
+    *out = NULL;
+    if (total == 0) return 0;
+    *out = (ncdbScopeT *)malloc(total * sizeof(**out));
+    if (!*out) return -1;
+    for (i = 0; i < db->root_count; ++i) dfs_collect_(db->roots[i], *out, &idx);
+    return 0;
+}
+
 const char *ncdb_GetLastError(ncdbT db) { return (db && db->last_error) ? db->last_error : ""; }
+
+/* ── TOGGLE metadata accessors ─────────────────────────────────────────── */
+const char *ncdb_GetToggleCanonicalName(ncdbT db, ncdbScopeT s) { (void)db; return s ? s->toggle_canonical : NULL; }
+uint8_t     ncdb_GetToggleMetric(ncdbT db, ncdbScopeT s)        { (void)db; return s ? s->toggle_metric : 0; }
+uint8_t     ncdb_GetToggleType(ncdbT db, ncdbScopeT s)          { (void)db; return s ? s->toggle_type : 0; }
+uint8_t     ncdb_GetToggleDir(ncdbT db, ncdbScopeT s)           { (void)db; return s ? s->toggle_dir : 0; }
+int ncdb_SetToggleCanonicalName(ncdbT db, ncdbScopeT s, const char *name) {
+    char *copy;
+    (void)db;
+    if (!s) return -1;
+    copy = ncdb_impl_strdup(name ? name : "");
+    if (!copy) return -1;
+    free(s->toggle_canonical);
+    s->toggle_canonical = copy;
+    return 0;
+}
+void ncdb_SetToggleMetric(ncdbT db, ncdbScopeT s, uint8_t v) { (void)db; if (s) s->toggle_metric = v; }
+void ncdb_SetToggleType  (ncdbT db, ncdbScopeT s, uint8_t v) { (void)db; if (s) s->toggle_type   = v; }
+void ncdb_SetToggleDir   (ncdbT db, ncdbScopeT s, uint8_t v) { (void)db; if (s) s->toggle_dir    = v; }
+
+/* ── FSM metadata accessors ────────────────────────────────────────────── */
+/* ── Coverpoint / Cross UCIS metadata ──────────────────────────────────── */
+int ncdb_SetCoverpointExprTerms(ncdbT db, ncdbScopeT s, const char *expr) {
+    char *copy;
+    (void)db;
+    if (!s) return -1;
+    copy = ncdb_impl_strdup(expr ? expr : "");
+    if (!copy) return -1;
+    free(s->expr_terms); s->expr_terms = copy;
+    return 0;
+}
+const char *ncdb_GetCoverpointExprTerms(ncdbT db, ncdbScopeT s) {
+    (void)db; return s ? s->expr_terms : NULL;
+}
+size_t ncdb_GetCrossArity(ncdbT db, ncdbScopeT cross) {
+    (void)db; return cross ? cross->crossed_count : 0;
+}
+
+/* ── Per-cover UCIS metadata ───────────────────────────────────────────── */
+int ncdb_SetCoverSource(ncdbT db, ncdbCoverT c, const char *path, uint64_t line, uint64_t token) {
+    char *copy;
+    (void)db;
+    if (!c || !path) return -1;
+    copy = ncdb_impl_strdup(path);
+    if (!copy) return -1;
+    free(c->source_path); c->source_path = copy;
+    c->source_line = line; c->source_token = token;
+    return 0;
+}
+int ncdb_SetCoverWeight (ncdbT db, ncdbCoverT c, uint64_t w) { (void)db; if (!c) return -1; c->weight = w; return 0; }
+int ncdb_SetCoverGoal   (ncdbT db, ncdbCoverT c, int64_t g)  { (void)db; if (!c) return -1; c->goal = g; return 0; }
+int ncdb_SetCoverComment(ncdbT db, ncdbCoverT c, const char *cm) {
+    char *copy;
+    (void)db;
+    if (!c) return -1;
+    copy = ncdb_impl_strdup(cm ? cm : "");
+    if (!copy) return -1;
+    free(c->comment); c->comment = copy;
+    return 0;
+}
+int ncdb_SetCoverAtLeast(ncdbT db, ncdbCoverT c, uint64_t al) { (void)db; if (!c) return -1; c->at_least = al; return 0; }
+const char *ncdb_GetCoverSourcePath (ncdbT db, ncdbCoverT c) { (void)db; return c ? c->source_path : NULL; }
+uint64_t    ncdb_GetCoverSourceLine (ncdbT db, ncdbCoverT c) { (void)db; return c ? c->source_line : 0; }
+uint64_t    ncdb_GetCoverSourceToken(ncdbT db, ncdbCoverT c) { (void)db; return c ? c->source_token : 0; }
+uint64_t    ncdb_GetCoverWeight (ncdbT db, ncdbCoverT c)     { (void)db; return c ? c->weight : 0; }
+int64_t     ncdb_GetCoverGoal   (ncdbT db, ncdbCoverT c)     { (void)db; return c ? c->goal : -1; }
+const char *ncdb_GetCoverComment(ncdbT db, ncdbCoverT c)     { (void)db; return c ? c->comment : NULL; }
+uint64_t    ncdb_GetCoverAtLeast(ncdbT db, ncdbCoverT c)     { (void)db; return c ? c->at_least : 0; }
+
+/* ── DU↔instance linking ───────────────────────────────────────────────── */
+int ncdb_SetScopeDU(ncdbT db, ncdbScopeT instance, ncdbScopeT du) {
+    (void)db;
+    if (!instance) return -1;
+    instance->du_scope = du;  /* not owned; du lives in same tree */
+    return 0;
+}
+ncdbScopeT ncdb_GetScopeDU(ncdbT db, ncdbScopeT instance) {
+    (void)db; return instance ? instance->du_scope : NULL;
+}
+int ncdb_SetDUSignature(ncdbT db, ncdbScopeT du, const char *sig) {
+    char *copy;
+    (void)db;
+    if (!du) return -1;
+    copy = ncdb_impl_strdup(sig ? sig : "");
+    if (!copy) return -1;
+    free(du->du_signature); du->du_signature = copy;
+    return 0;
+}
+const char *ncdb_GetDUSignature(ncdbT db, ncdbScopeT du) {
+    (void)db; return du ? du->du_signature : NULL;
+}
+
+int ncdb_DuAddFile(ncdbT db, ncdbScopeT du, const char *path) {
+    int global_id;
+    if (!db || !du || !path) return -1;
+    global_id = ncdb_impl_get_source_id(db, path, 1);
+    if (global_id < 0) return -1;
+    if (du->du_file_count == du->du_file_cap) {
+        size_t ncap = du->du_file_cap ? du->du_file_cap * 2U : 4U;
+        uint32_t *na = (uint32_t *)realloc(du->du_files, ncap * sizeof(*na));
+        if (!na) return -1;
+        du->du_files = na; du->du_file_cap = ncap;
+    }
+    du->du_files[du->du_file_count] = (uint32_t)global_id;
+    return (int)du->du_file_count++;
+}
+size_t ncdb_DuFileCount(ncdbT db, ncdbScopeT du) { (void)db; return du ? du->du_file_count : 0; }
+const char *ncdb_DuGetFile(ncdbT db, ncdbScopeT du, size_t idx) {
+    if (!db || !du || idx >= du->du_file_count) return NULL;
+    {
+        uint32_t gid = du->du_files[idx];
+        return (gid < db->source_count) ? db->sources[gid] : NULL;
+    }
+}
+
+/* ── Scope tags ────────────────────────────────────────────────────────── */
+int ncdb_ScopeAddTag(ncdbT db, ncdbScopeT s, const char *tag) {
+    char *copy;
+    (void)db;
+    if (!s || !tag) return -1;
+    if (s->tag_count == s->tag_cap) {
+        size_t ncap = s->tag_cap ? s->tag_cap * 2U : 4U;
+        char **na = (char **)realloc(s->tags, ncap * sizeof(*na));
+        if (!na) return -1;
+        s->tags = na; s->tag_cap = ncap;
+    }
+    copy = ncdb_impl_strdup(tag);
+    if (!copy) return -1;
+    s->tags[s->tag_count++] = copy;
+    return 0;
+}
+size_t ncdb_ScopeTagCount(ncdbT db, ncdbScopeT s) { (void)db; return s ? s->tag_count : 0; }
+const char *ncdb_ScopeGetTag(ncdbT db, ncdbScopeT s, size_t idx) {
+    (void)db; return (s && idx < s->tag_count) ? s->tags[idx] : NULL;
+}
+
+int ncdb_FsmAddState(ncdbT db, ncdbScopeT fsm, const char *name, uint32_t value) {
+    char *copy;
+    (void)db;
+    if (!fsm || !name) return -1;
+    if (fsm->fsm_state_count == fsm->fsm_state_cap) {
+        size_t ncap = fsm->fsm_state_cap ? fsm->fsm_state_cap * 2U : 4U;
+        struct ncdb_fsm_state_s *na =
+            (struct ncdb_fsm_state_s *)realloc(fsm->fsm_states, ncap * sizeof(*na));
+        if (!na) return -1;
+        fsm->fsm_states = na;
+        fsm->fsm_state_cap = ncap;
+    }
+    copy = ncdb_impl_strdup(name);
+    if (!copy) return -1;
+    fsm->fsm_states[fsm->fsm_state_count].name  = copy;
+    fsm->fsm_states[fsm->fsm_state_count].value = value;
+    fsm->fsm_state_count++;
+    return 0;
+}
+size_t ncdb_FsmStateCount(ncdbT db, ncdbScopeT fsm) {
+    (void)db; return fsm ? fsm->fsm_state_count : 0;
+}
+int ncdb_FsmGetState(ncdbT db, ncdbScopeT fsm, size_t idx, const char **name, uint32_t *value) {
+    (void)db;
+    if (!fsm || idx >= fsm->fsm_state_count) return -1;
+    if (name)  *name  = fsm->fsm_states[idx].name;
+    if (value) *value = fsm->fsm_states[idx].value;
+    return 0;
+}
+
+/* ── Typed attribute public API ────────────────────────────────────────── */
+
+int ncdb_DbSetAttr(ncdbT db, const char *key, const ncdbAttrValue *v) {
+    return (db && key && v) ? ncdb_attr_table_set(&db->attrs, key, v) : -1;
+}
+int ncdb_ScopeSetAttr(ncdbT db, ncdbScopeT s, const char *key, const ncdbAttrValue *v) {
+    (void)db; return (s && key && v) ? ncdb_attr_table_set(&s->attrs, key, v) : -1;
+}
+int ncdb_CoverSetAttr(ncdbT db, ncdbCoverT c, const char *key, const ncdbAttrValue *v) {
+    (void)db; return (c && key && v) ? ncdb_attr_table_set(&c->attrs, key, v) : -1;
+}
+int ncdb_HistorySetAttr(ncdbT db, ncdbHistoryNodeT h, const char *key, const ncdbAttrValue *v) {
+    (void)db; return (h && key && v) ? ncdb_attr_table_set(&h->attrs, key, v) : -1;
+}
+
+int ncdb_DbGetAttr(ncdbT db, const char *key, ncdbAttrValue *out) {
+    return (db && key) ? ncdb_attr_table_get(&db->attrs, key, out) : -1;
+}
+int ncdb_ScopeGetAttr(ncdbT db, ncdbScopeT s, const char *key, ncdbAttrValue *out) {
+    (void)db; return (s && key) ? ncdb_attr_table_get(&s->attrs, key, out) : -1;
+}
+int ncdb_CoverGetAttr(ncdbT db, ncdbCoverT c, const char *key, ncdbAttrValue *out) {
+    (void)db; return (c && key) ? ncdb_attr_table_get(&c->attrs, key, out) : -1;
+}
+int ncdb_HistoryGetAttr(ncdbT db, ncdbHistoryNodeT h, const char *key, ncdbAttrValue *out) {
+    (void)db; return (h && key) ? ncdb_attr_table_get(&h->attrs, key, out) : -1;
+}
+
+int ncdb_DbAttrIterate(ncdbT db, int (*cb)(const char *, const ncdbAttrValue *, void *), void *ud) {
+    return db ? ncdb_attr_table_iterate(&db->attrs, cb, ud) : 0;
+}
+int ncdb_ScopeAttrIterate(ncdbT db, ncdbScopeT s, int (*cb)(const char *, const ncdbAttrValue *, void *), void *ud) {
+    (void)db; return s ? ncdb_attr_table_iterate(&s->attrs, cb, ud) : 0;
+}
+int ncdb_CoverAttrIterate(ncdbT db, ncdbCoverT c, int (*cb)(const char *, const ncdbAttrValue *, void *), void *ud) {
+    (void)db; return c ? ncdb_attr_table_iterate(&c->attrs, cb, ud) : 0;
+}
+int ncdb_HistoryAttrIterate(ncdbT db, ncdbHistoryNodeT h, int (*cb)(const char *, const ncdbAttrValue *, void *), void *ud) {
+    (void)db; return h ? ncdb_attr_table_iterate(&h->attrs, cb, ud) : 0;
+}

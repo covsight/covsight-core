@@ -31,10 +31,11 @@ def detect_cdb_format(path: str) -> str:
 
     if len(header) >= 4 and header[:4] in ZIP_SIGNATURES:
         try:
+            from .manifest import Manifest
             with zipfile.ZipFile(path, "r") as zf:
                 with zf.open(MEMBER_MANIFEST) as mf:
-                    manifest = json.load(mf)
-                    if manifest.get("format") == NCDB_FORMAT:
+                    m = Manifest.from_bytes(mf.read())
+                    if m.format == NCDB_FORMAT:
                         return "ncdb"
         except (zipfile.BadZipFile, KeyError, json.JSONDecodeError, Exception):
             pass

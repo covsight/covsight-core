@@ -77,10 +77,38 @@ class HistoryWriter:
         return json.dumps(records, indent=2).encode("utf-8")
 
 
+_NHIS_MAGIC = b"NHIS"
+_NHIS_VERSION = 1
+_NHIS_STRINGS = (
+    "logical_name", "physical_name", "user_name", "seed", "tool_category",
+    "comment", "date", "run_cwd", "cmd", "args", "time_unit",
+    "vendor_id", "vendor_tool", "vendor_tool_version", "same_tests",
+)
+
+
+def _enc_varint(v: int) -> bytes:
+    out = bytearray()
+    while True:
+        b = v & 0x7F; v >>= 7
+        if v: out.append(b | 0x80)
+        else: out.append(b); return bytes(out)
+
+
+def _dec_varint(data: bytes, off: int):
+    r = 0; shift = 0
+    while True:
+        b = data[off]; off += 1
+        r |= (b & 0x7F) << shift
+        if (b & 0x80) == 0: return r, off
+        shift += 7
+
+
 class HistoryReader:
-    """Deserialize history nodes from history.json bytes."""
+    """Deserialize history nodes from history.bin bytes (binary NHIS or legacy JSON)."""
 
     def deserialize(self, data: bytes) -> list:
+        if data[:4] == _NHIS_MAGIC:
+            return self._deserialize_binary(data)
         records = json.loads(data.decode("utf-8"))
         nodes = []
         for rec in records:
@@ -125,5 +153,46 @@ class HistoryReader:
                 node.setSameTests(rec["same_tests"])
             if rec.get("comment") is not None:
                 node.setComment(rec["comment"])
+            nodes.append(node)
+        return nodes
+
+    def _deserialize_binary(self, data: bytes) -> list:
+        from struct import unpack
+        o = 4
+        version = data[o]; o += 1
+        if version != _NHIS_VERSION:
+            raise ValueError(f"unsupported history binary version {version}")
+        n, o = _dec_varint(data, o)
+        nodes = []
+        for _ in range(n):
+            kind_int = data[o]; o += 1
+            parent_p1, o = _dec_varint(data, o)
+            status, o = _dec_varint(data, o)
+            compulsory = data[o]; o += 1
+            sim_time, = unpack("<d", data[o:o + 8]); o += 8
+            cpu_time, = unpack("<d", data[o:o + 8]); o += 8
+            cost,     = unpack("<d", data[o:o + 8]); o += 8
+            fields = {}
+            for name in _NHIS_STRINGS:
+                ln, o = _dec_varint(data, o)
+                fields[name] = data[o:o + ln].decode("utf-8") if ln else ""
+                o += ln
+            node = MemHistoryNode(
+                parent=None,
+                logicalname=fields["logical_name"],
+                physicalname=fields["physical_name"] or None,
+                kind=HistoryNodeKind(kind_int) if kind_int in {1, 2} else HistoryNodeKind.TEST,
+            )
+            node.setTestStatus(_status_from_int(status))
+            node.setCompulsory(compulsory)
+            node.setSimTime(sim_time)
+            node.setCpuTime(cpu_time)
+            node.setCost(cost)
+            for n_ in ("user_name", "seed", "tool_category", "comment", "date",
+                       "run_cwd", "cmd", "args", "time_unit",
+                       "vendor_id", "vendor_tool", "vendor_tool_version", "same_tests"):
+                if fields[n_]:
+                    getattr(node, "set" + "".join(p.capitalize() for p in n_.split("_")))(fields[n_])
+            # parent_p1 reserved for future tree linking; current MemHistoryNode is flat
             nodes.append(node)
         return nodes

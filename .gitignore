@@ -11,4 +11,4 @@ build/
 packages/
 node_modules/
 
-_build/
+_build*/

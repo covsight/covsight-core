@@ -32,6 +32,7 @@ set(NCDB_SOURCES
     src/ncdb_toggle.c
     src/ncdb_cross.c
     src/ncdb_fsm.c
+    src/ncdb_tags.c
     src/ncdb_issues.c
     src/ncdb_db.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../packages/cjson/cJSON.c)

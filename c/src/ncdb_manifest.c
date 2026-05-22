@@ -135,6 +135,7 @@ void ncdb_manifest_init(ncdbManifest *m) {
 void ncdb_manifest_free(ncdbManifest *m) {
     free(m->format); free(m->version); free(m->ucis_version); free(m->created);
     free(m->path_separator); free(m->schema_hash); free(m->generator); free(m->history_format);
+    free(m->vendor_id); free(m->vendor_tool); free(m->vendor_tool_version); free(m->ucis_standard);
     memset(m, 0, sizeof(*m));
 }
 
@@ -169,45 +170,80 @@ int ncdb_manifest_build(ncdbT db, const uint8_t *scope_tree, size_t scope_tree_s
         }
     }
     m->schema_hash = schema_hash(scope_tree, scope_tree_size);
+    if (db->vendor_id)           { free(m->vendor_id);           m->vendor_id           = ncdb_impl_strdup(db->vendor_id); }
+    if (db->vendor_tool)         { free(m->vendor_tool);         m->vendor_tool         = ncdb_impl_strdup(db->vendor_tool); }
+    if (db->vendor_tool_version) { free(m->vendor_tool_version); m->vendor_tool_version = ncdb_impl_strdup(db->vendor_tool_version); }
+    if (db->ucis_standard)       { free(m->ucis_standard);       m->ucis_standard       = ncdb_impl_strdup(db->ucis_standard); }
     return (m->created && m->path_separator && m->schema_hash) ? 0 : -1;
 }
 
-static void add_str(cJSON *obj, const char *key, const char *value) {
-    if (value) cJSON_AddStringToObject(obj, key, value); else cJSON_AddNullToObject(obj, key);
-}
+/*
+ * manifest.json — binary v1 (magic "NMAN"). Legacy JSON readers are still
+ * accepted on deserialize for backward compat with existing fixtures. The
+ * writer emits binary only.
+ *
+ * Format:
+ *   magic[4]   "NMAN"
+ *   version: u8 = 1
+ *   12 length-prefixed strings (varint length, raw bytes; empty allowed):
+ *     format, version, ucis_version, created, path_separator,
+ *     schema_hash, generator, history_format,
+ *     vendor_id, vendor_tool, vendor_tool_version, ucis_standard
+ *   5 varints:
+ *     scope_count, coveritem_count, test_count, total_hits, covered_bins
+ */
 
-int ncdb_manifest_serialize(const ncdbManifest *m, ncdbBuf *out) {
-    cJSON *obj = cJSON_CreateObject();
-    char *text;
-    if (!obj) return -1;
-    add_str(obj, "format", m->format);
-    add_str(obj, "version", m->version);
-    add_str(obj, "ucis_version", m->ucis_version);
-    add_str(obj, "created", m->created);
-    add_str(obj, "path_separator", m->path_separator);
-    cJSON_AddNumberToObject(obj, "scope_count", (double)m->scope_count);
-    cJSON_AddNumberToObject(obj, "coveritem_count", (double)m->coveritem_count);
-    cJSON_AddNumberToObject(obj, "test_count", (double)m->test_count);
-    cJSON_AddNumberToObject(obj, "total_hits", (double)m->total_hits);
-    cJSON_AddNumberToObject(obj, "covered_bins", (double)m->covered_bins);
-    add_str(obj, "schema_hash", m->schema_hash);
-    add_str(obj, "generator", m->generator);
-    add_str(obj, "history_format", m->history_format);
-    text = cJSON_Print(obj);
-    cJSON_Delete(obj);
-    if (!text) return -1;
-    if (ncdb_impl_buf_append(out, text, strlen(text)) != 0) {
-        cJSON_free(text);
-        return -1;
-    }
-    cJSON_free(text);
+#define NCDB_MANIFEST_MAGIC    "NMAN"
+#define NCDB_MANIFEST_MAGIC_SZ 4U
+#define NCDB_MANIFEST_VERSION  1U
+
+static int write_lp_str(ncdbBuf *b, const char *s) {
+    size_t len = s ? strlen(s) : 0;
+    if (ncdb_varint_encode_uint64((uint64_t)len, b) != 0) return -1;
+    if (len > 0 && ncdb_impl_buf_append(b, s, len) != 0) return -1;
     return 0;
 }
 
-int ncdb_manifest_deserialize(const uint8_t *data, size_t size, ncdbManifest *m, char *errbuf, size_t errbuf_sz) {
+static int read_lp_str(const uint8_t *data, size_t size, size_t *off, char **out) {
+    uint64_t len; char *buf;
+    if (ncdb_varint_decode_uint64(data, size, off, &len) != 0) return -1;
+    if (*off + len > size) return -1;
+    buf = (char *)malloc((size_t)len + 1);
+    if (!buf) return -1;
+    if (len > 0) memcpy(buf, data + *off, (size_t)len);
+    buf[len] = '\0';
+    *off += (size_t)len;
+    free(*out); *out = buf;
+    return 0;
+}
+
+int ncdb_manifest_serialize(const ncdbManifest *m, ncdbBuf *out) {
+    uint8_t version = NCDB_MANIFEST_VERSION;
+    if (ncdb_impl_buf_append(out, NCDB_MANIFEST_MAGIC, NCDB_MANIFEST_MAGIC_SZ) != 0) return -1;
+    if (ncdb_impl_buf_append(out, &version, 1) != 0) return -1;
+    if (write_lp_str(out, m->format) != 0) return -1;
+    if (write_lp_str(out, m->version) != 0) return -1;
+    if (write_lp_str(out, m->ucis_version) != 0) return -1;
+    if (write_lp_str(out, m->created) != 0) return -1;
+    if (write_lp_str(out, m->path_separator) != 0) return -1;
+    if (write_lp_str(out, m->schema_hash) != 0) return -1;
+    if (write_lp_str(out, m->generator) != 0) return -1;
+    if (write_lp_str(out, m->history_format) != 0) return -1;
+    if (write_lp_str(out, m->vendor_id) != 0) return -1;
+    if (write_lp_str(out, m->vendor_tool) != 0) return -1;
+    if (write_lp_str(out, m->vendor_tool_version) != 0) return -1;
+    if (write_lp_str(out, m->ucis_standard) != 0) return -1;
+    if (ncdb_varint_encode_uint64(m->scope_count, out) != 0) return -1;
+    if (ncdb_varint_encode_uint64(m->coveritem_count, out) != 0) return -1;
+    if (ncdb_varint_encode_uint64(m->test_count, out) != 0) return -1;
+    if (ncdb_varint_encode_uint64(m->total_hits, out) != 0) return -1;
+    if (ncdb_varint_encode_uint64(m->covered_bins, out) != 0) return -1;
+    return 0;
+}
+
+static int deserialize_json_fallback(const uint8_t *data, size_t size, ncdbManifest *m, char *errbuf, size_t errbuf_sz) {
     cJSON *obj = cJSON_ParseWithLength((const char *)data, size);
     cJSON *it;
-    ncdb_manifest_init(m);
     if (!obj || !cJSON_IsObject(obj)) {
         snprintf(errbuf, errbuf_sz, "%s", "invalid manifest json");
         cJSON_Delete(obj);
@@ -219,8 +255,47 @@ int ncdb_manifest_deserialize(const uint8_t *data, size_t size, ncdbManifest *m,
     GETS(path_separator, "path_separator"); GETN(scope_count, "scope_count"); GETN(coveritem_count, "coveritem_count");
     GETN(test_count, "test_count"); GETN(total_hits, "total_hits"); GETN(covered_bins, "covered_bins");
     GETS(schema_hash, "schema_hash"); GETS(generator, "generator"); GETS(history_format, "history_format");
+    GETS(vendor_id, "vendor_id"); GETS(vendor_tool, "vendor_tool"); GETS(vendor_tool_version, "vendor_tool_version");
+    GETS(ucis_standard, "ucis_standard");
 #undef GETS
 #undef GETN
     cJSON_Delete(obj);
     return 0;
+}
+
+int ncdb_manifest_deserialize(const uint8_t *data, size_t size, ncdbManifest *m, char *errbuf, size_t errbuf_sz) {
+    size_t off;
+    uint8_t version;
+    ncdb_manifest_init(m);
+    if (size < NCDB_MANIFEST_MAGIC_SZ + 1 ||
+        memcmp(data, NCDB_MANIFEST_MAGIC, NCDB_MANIFEST_MAGIC_SZ) != 0) {
+        return deserialize_json_fallback(data, size, m, errbuf, errbuf_sz);
+    }
+    off = NCDB_MANIFEST_MAGIC_SZ;
+    version = data[off++];
+    if (version != NCDB_MANIFEST_VERSION) {
+        snprintf(errbuf, errbuf_sz, "unknown manifest binary version %u", (unsigned)version);
+        return -1;
+    }
+    if (read_lp_str(data, size, &off, &m->format) != 0) goto bad;
+    if (read_lp_str(data, size, &off, &m->version) != 0) goto bad;
+    if (read_lp_str(data, size, &off, &m->ucis_version) != 0) goto bad;
+    if (read_lp_str(data, size, &off, &m->created) != 0) goto bad;
+    if (read_lp_str(data, size, &off, &m->path_separator) != 0) goto bad;
+    if (read_lp_str(data, size, &off, &m->schema_hash) != 0) goto bad;
+    if (read_lp_str(data, size, &off, &m->generator) != 0) goto bad;
+    if (read_lp_str(data, size, &off, &m->history_format) != 0) goto bad;
+    if (read_lp_str(data, size, &off, &m->vendor_id) != 0) goto bad;
+    if (read_lp_str(data, size, &off, &m->vendor_tool) != 0) goto bad;
+    if (read_lp_str(data, size, &off, &m->vendor_tool_version) != 0) goto bad;
+    if (read_lp_str(data, size, &off, &m->ucis_standard) != 0) goto bad;
+    if (ncdb_varint_decode_uint64(data, size, &off, &m->scope_count) != 0) goto bad;
+    if (ncdb_varint_decode_uint64(data, size, &off, &m->coveritem_count) != 0) goto bad;
+    if (ncdb_varint_decode_uint64(data, size, &off, &m->test_count) != 0) goto bad;
+    if (ncdb_varint_decode_uint64(data, size, &off, &m->total_hits) != 0) goto bad;
+    if (ncdb_varint_decode_uint64(data, size, &off, &m->covered_bins) != 0) goto bad;
+    return 0;
+bad:
+    snprintf(errbuf, errbuf_sz, "%s", "truncated manifest binary");
+    return -1;
 }
