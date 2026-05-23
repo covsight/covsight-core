@@ -50,3 +50,4 @@ target_link_libraries(ncdb PUBLIC MINIZIP::minizip)
 
 enable_testing()
 add_subdirectory(tests)
+add_subdirectory(ucis)
