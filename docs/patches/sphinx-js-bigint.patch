@@ -1,0 +1,11 @@
+--- a/sphinx_js/js/convertType.ts	2026-05-17 16:34:01.098440012 +0000
++++ b/sphinx_js/js/convertType.ts	2026-05-17 16:34:01.097439982 +0000
+@@ -139,7 +139,7 @@
+     if (type.value === null) {
+       return [intrinsicType("null")];
+     }
+-    return [JSON.stringify(type.value)];
++    return [typeof type.value === "bigint" ? type.value.toString() + "n" : JSON.stringify(type.value)];
+   }
+   mapped(type: MappedType): Type {
+     const read = {
