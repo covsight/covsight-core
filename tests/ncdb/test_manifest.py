@@ -2,7 +2,6 @@
 Manifest round-trip and validation tests.
 """
 
-import json
 import hashlib
 import tempfile
 import os
@@ -42,17 +41,17 @@ def test_manifest_format_field():
     db = _make_db()
     tree = _scope_tree_bytes(db)
     m = Manifest.build(db, tree, [], [])
-    data = json.loads(m.serialize())
-    assert data["format"] == NCDB_FORMAT
+    data = Manifest.from_bytes(m.serialize())
+    assert data.format == NCDB_FORMAT
 
 
 def test_manifest_schema_hash_sha256():
     db = _make_db()
     tree = _scope_tree_bytes(db)
     m = Manifest.build(db, tree, [], [])
-    data = json.loads(m.serialize())
+    data = Manifest.from_bytes(m.serialize())
     expected = "sha256:" + hashlib.sha256(tree).hexdigest()
-    assert data["schema_hash"] == expected
+    assert data.schema_hash == expected
 
 
 def test_manifest_schema_hash_deterministic():
@@ -94,8 +93,8 @@ def test_manifest_version_present():
     db = _make_db()
     tree = _scope_tree_bytes(db)
     m = Manifest.build(db, tree, [], [])
-    data = json.loads(m.serialize())
-    assert "version" in data
+    data = Manifest.from_bytes(m.serialize())
+    assert data.version
 
 
 def test_manifest_path_separator_stored():
@@ -103,5 +102,5 @@ def test_manifest_path_separator_stored():
     db.setPathSeparator(".")
     tree = _scope_tree_bytes(db)
     m = Manifest.build(db, tree, [], [])
-    data = json.loads(m.serialize())
-    assert data.get("path_separator") == "."
+    data = Manifest.from_bytes(m.serialize())
+    assert data.path_separator == "."

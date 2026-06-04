@@ -8,6 +8,10 @@ build/
 .eggs/
 .pytest_cache/
 *.cdb
+# Golden compat fixtures are committed (see tests/compat/golden/README.md);
+# the C migration tests read them and they cannot be regenerated in CI
+# because they intentionally carry the pre-3.0 JSON manifest format.
+!tests/compat/golden/*.cdb
 packages/
 node_modules/
 

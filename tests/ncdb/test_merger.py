@@ -117,12 +117,12 @@ def test_same_schema_preserves_schema_hash():
         _write_ncdb(db, pb)
         NcdbMerger().merge([pa, pb], pm)
 
-        import zipfile, json
+        import zipfile
         with zipfile.ZipFile(pa) as zf:
-            mf_a = json.loads(zf.read("manifest.json"))
+            mf_a = Manifest.from_bytes(zf.read("manifest.json"))
         with zipfile.ZipFile(pm) as zf:
-            mf_m = json.loads(zf.read("manifest.json"))
-        assert mf_a["schema_hash"] == mf_m["schema_hash"]
+            mf_m = Manifest.from_bytes(zf.read("manifest.json"))
+        assert mf_a.schema_hash == mf_m.schema_hash
 
 
 # ── History accumulation ──────────────────────────────────────────────────
