@@ -130,6 +130,8 @@ void ncdb_manifest_init(ncdbManifest *m) {
     m->path_separator = ncdb_impl_strdup("/");
     m->generator = ncdb_impl_strdup(NCDB_GENERATOR);
     m->history_format = ncdb_impl_strdup(NCDB_HISTORY_FORMAT_V1);
+    m->schema_version_major = NCDB_SCHEMA_VERSION_MAJOR;
+    m->schema_version_minor = NCDB_SCHEMA_VERSION_MINOR;
 }
 
 void ncdb_manifest_free(ncdbManifest *m) {
@@ -169,6 +171,11 @@ int ncdb_manifest_build(ncdbT db, const uint8_t *scope_tree, size_t scope_tree_s
             m->test_count++;
         }
     }
+    m->n_history_nodes = (uint64_t)db->history_count;
+    /* n_associations is populated by M4 when tests_assoc.bin lands;
+     * remains 0 here. feature_flags is populated by each member's
+     * writer setting its bit on db before manifest_build. */
+    m->feature_flags = db->feature_flags;
     m->schema_hash = schema_hash(scope_tree, scope_tree_size);
     if (db->vendor_id)           { free(m->vendor_id);           m->vendor_id           = ncdb_impl_strdup(db->vendor_id); }
     if (db->vendor_tool)         { free(m->vendor_tool);         m->vendor_tool         = ncdb_impl_strdup(db->vendor_tool); }
@@ -178,11 +185,9 @@ int ncdb_manifest_build(ncdbT db, const uint8_t *scope_tree, size_t scope_tree_s
 }
 
 /*
- * manifest.json — binary v1 (magic "NMAN"). Legacy JSON readers are still
- * accepted on deserialize for backward compat with existing fixtures. The
- * writer emits binary only.
+ * manifest.json — binary "NMAN" with two extant versions.
  *
- * Format:
+ * v1 (legacy; emitted by NCDB v3.0 writers):
  *   magic[4]   "NMAN"
  *   version: u8 = 1
  *   12 length-prefixed strings (varint length, raw bytes; empty allowed):
@@ -191,11 +196,27 @@ int ncdb_manifest_build(ncdbT db, const uint8_t *scope_tree, size_t scope_tree_s
  *     vendor_id, vendor_tool, vendor_tool_version, ucis_standard
  *   5 varints:
  *     scope_count, coveritem_count, test_count, total_hits, covered_bins
+ *
+ * v2 (Phase 4.8 / M8; emitted by NCDB v3.x-on-v4-track and v4.0):
+ *   ...v1 payload above, byte-identical...
+ *   schema_version_major: u32 LE
+ *   schema_version_minor: u32 LE
+ *   feature_flags:        u64 LE
+ *   n_history_nodes:      varint
+ *   n_associations:       varint
+ *
+ * Readers handle both. v1 readers reject v2 cleanly at the version byte
+ * check ("unknown manifest binary version 2") — that is the intentional
+ * cut-over signal for v3 readers encountering v4 fixtures.
+ *
+ * Legacy JSON readers are still accepted on deserialize for backward
+ * compat with existing fixtures; the writer emits binary only.
  */
 
 #define NCDB_MANIFEST_MAGIC    "NMAN"
 #define NCDB_MANIFEST_MAGIC_SZ 4U
-#define NCDB_MANIFEST_VERSION  1U
+#define NCDB_MANIFEST_VERSION  2U   /* v2 = M8 (Phase 4.8) */
+#define NCDB_MANIFEST_VERSION_V1 1U /* legacy, still accepted on deserialize */
 
 static int write_lp_str(ncdbBuf *b, const char *s) {
     size_t len = s ? strlen(s) : 0;
@@ -214,6 +235,38 @@ static int read_lp_str(const uint8_t *data, size_t size, size_t *off, char **out
     buf[len] = '\0';
     *off += (size_t)len;
     free(*out); *out = buf;
+    return 0;
+}
+
+static int write_u32le(ncdbBuf *b, uint32_t v) {
+    uint8_t bytes[4];
+    bytes[0] = (uint8_t)(v);       bytes[1] = (uint8_t)(v >> 8);
+    bytes[2] = (uint8_t)(v >> 16); bytes[3] = (uint8_t)(v >> 24);
+    return ncdb_impl_buf_append(b, bytes, 4);
+}
+
+static int read_u32le(const uint8_t *data, size_t size, size_t *off, uint32_t *out) {
+    uint32_t v;
+    if (*off + 4 > size) return -1;
+    v  = (uint32_t)data[*off]            |
+        ((uint32_t)data[*off + 1] << 8)  |
+        ((uint32_t)data[*off + 2] << 16) |
+        ((uint32_t)data[*off + 3] << 24);
+    *off += 4; *out = v;
+    return 0;
+}
+
+static int write_u64le_m(ncdbBuf *b, uint64_t v) {
+    uint8_t bytes[8]; int i;
+    for (i = 0; i < 8; ++i) bytes[i] = (uint8_t)(v >> (i * 8));
+    return ncdb_impl_buf_append(b, bytes, 8);
+}
+
+static int read_u64le_m(const uint8_t *data, size_t size, size_t *off, uint64_t *out) {
+    int i; uint64_t v = 0;
+    if (*off + 8 > size) return -1;
+    for (i = 0; i < 8; ++i) v |= ((uint64_t)data[*off + i]) << (i * 8);
+    *off += 8; *out = v;
     return 0;
 }
 
@@ -238,6 +291,12 @@ int ncdb_manifest_serialize(const ncdbManifest *m, ncdbBuf *out) {
     if (ncdb_varint_encode_uint64(m->test_count, out) != 0) return -1;
     if (ncdb_varint_encode_uint64(m->total_hits, out) != 0) return -1;
     if (ncdb_varint_encode_uint64(m->covered_bins, out) != 0) return -1;
+    /* v2 extension (Phase 4.8 / M8). */
+    if (write_u32le(out, m->schema_version_major) != 0) return -1;
+    if (write_u32le(out, m->schema_version_minor) != 0) return -1;
+    if (write_u64le_m(out, m->feature_flags) != 0) return -1;
+    if (ncdb_varint_encode_uint64(m->n_history_nodes, out) != 0) return -1;
+    if (ncdb_varint_encode_uint64(m->n_associations, out) != 0) return -1;
     return 0;
 }
 
@@ -273,7 +332,7 @@ int ncdb_manifest_deserialize(const uint8_t *data, size_t size, ncdbManifest *m,
     }
     off = NCDB_MANIFEST_MAGIC_SZ;
     version = data[off++];
-    if (version != NCDB_MANIFEST_VERSION) {
+    if (version != NCDB_MANIFEST_VERSION && version != NCDB_MANIFEST_VERSION_V1) {
         snprintf(errbuf, errbuf_sz, "unknown manifest binary version %u", (unsigned)version);
         return -1;
     }
@@ -294,6 +353,21 @@ int ncdb_manifest_deserialize(const uint8_t *data, size_t size, ncdbManifest *m,
     if (ncdb_varint_decode_uint64(data, size, &off, &m->test_count) != 0) goto bad;
     if (ncdb_varint_decode_uint64(data, size, &off, &m->total_hits) != 0) goto bad;
     if (ncdb_varint_decode_uint64(data, size, &off, &m->covered_bins) != 0) goto bad;
+    if (version >= NCDB_MANIFEST_VERSION) {
+        /* v2 extension fields. */
+        if (read_u32le(data, size, &off, &m->schema_version_major) != 0) goto bad;
+        if (read_u32le(data, size, &off, &m->schema_version_minor) != 0) goto bad;
+        if (read_u64le_m(data, size, &off, &m->feature_flags) != 0) goto bad;
+        if (ncdb_varint_decode_uint64(data, size, &off, &m->n_history_nodes) != 0) goto bad;
+        if (ncdb_varint_decode_uint64(data, size, &off, &m->n_associations) != 0) goto bad;
+    } else {
+        /* v1: synthesize v4-track defaults so consumers can compare uniformly. */
+        m->schema_version_major = 3;
+        m->schema_version_minor = 0;
+        m->feature_flags = 0;
+        m->n_history_nodes = m->test_count;
+        m->n_associations = 0;
+    }
     return 0;
 bad:
     snprintf(errbuf, errbuf_sz, "%s", "truncated manifest binary");

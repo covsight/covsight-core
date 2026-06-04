@@ -88,9 +88,18 @@ ucisScopeT ucis_MatchDU(ucisT db, const char *name)
 {
     ncdbT core = ucis_internal_get_ncdb(db);
     if (!core || !name) return NULL;
-    du_search_t q = { name, NULL };
-    ncdb_ScopeIterate(core, NULL, 0xFFFFFFFFU, find_du_cb, &q);
-    return (ucisScopeT)q.match;
+    /* Phase 4.7 / M7 — when the scope_tree trailer is loaded, bsearch
+     * the sorted DU-name index in O(log n_du). Otherwise fall back to
+     * the recursive O(n) scan (used for in-memory DBs or v3 fixtures). */
+    {
+        ncdbScopeT hit = ncdb_match_du_by_name(core, name);
+        if (hit) return (ucisScopeT)hit;
+    }
+    {
+        du_search_t q = { name, NULL };
+        ncdb_ScopeIterate(core, NULL, 0xFFFFFFFFU, find_du_cb, &q);
+        return (ucisScopeT)q.match;
+    }
 }
 
 ucisScopeT ucis_CreateInstanceByName(ucisT             db,
@@ -240,4 +249,64 @@ void ucis_ParseDUName(const char  *du_name,
     if (library_name)   *library_name   = lib_p;
     if (primary_name)   *primary_name   = pri_p;
     if (secondary_name) *secondary_name = sec_p;
+}
+
+/* Phase 4.3 / M3 — UCIS §5.5 absolute-UID scope match.
+ *
+ * Two-tiered lookup:
+ *   1. If the database carries a loaded NUID index (built when the
+ *      archive was written), hash the input UID and bsearch. Resolve
+ *      the candidate DFS index back to a scope, recompute its UID and
+ *      strcmp to verify (collision-safe). O(log n).
+ *   2. Otherwise, walk every scope in DFS order, recompute each UID,
+ *      and strcmp until found. O(n). Used for in-memory DBs that have
+ *      never been written, where there's no index on disk yet.
+ *
+ * The `scope` argument is reserved for relative-UID lookups (UCIS
+ * §5.5.1 — "If a relative form Unique ID is supplied, matching starts
+ * at scope"). Not yet implemented; callers should pass NULL for now. */
+ucisScopeT ucis_MatchScopeByUniqueID(ucisT db, ucisScopeT scope,
+                                     const char* uniqueID)
+{
+    ncdbT core;
+    char uid_buf[1024];
+    int  uid_len;
+    (void)scope;
+    if (!db || !uniqueID) return NULL;
+    core = ucis_internal_get_ncdb(db);
+    if (!core) return NULL;
+
+    /* Fast path: hashed index. */
+    if (core->nuid_idx) {
+        uint64_t hash = ncdb_xxh64(uniqueID, strlen(uniqueID), 0);
+        size_t dfs   = ncdb_unique_id_index_lookup(core->nuid_idx, hash);
+        if (dfs != (size_t)-1) {
+            ncdbScopeT cand = ncdb_impl_scope_by_dfs_index(core, dfs);
+            if (cand) {
+                uid_len = ncdb_compute_unique_id(core, cand, uid_buf, sizeof(uid_buf));
+                if (uid_len > 0 && strcmp(uid_buf, uniqueID) == 0) {
+                    return (ucisScopeT)cand;
+                }
+            }
+        }
+        return NULL;
+    }
+
+    /* Slow path: O(n) DFS scan. Only reached when the DB has no NUID
+     * index loaded — typically an in-memory DB. */
+    {
+        ncdbScopeT *flat = NULL;
+        size_t flat_count = 0, i;
+        ucisScopeT result = NULL;
+        if (ncdb_impl_dfs_flatten(core, &flat, &flat_count) != 0) return NULL;
+        for (i = 0; i < flat_count; i++) {
+            uid_len = ncdb_compute_unique_id(core, flat[i], uid_buf, sizeof(uid_buf));
+            if (uid_len > 0 && strcmp(uid_buf, uniqueID) == 0) {
+                result = (ucisScopeT)flat[i];
+                break;
+            }
+        }
+        free(flat);
+        return result;
+    }
 }

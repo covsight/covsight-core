@@ -20,11 +20,48 @@
 
 #include "ucis_internal.h"
 #include "ncdb_impl.h"
+#include "ncdb/ncdb_props.h"
 
 #include <stdlib.h>
 #include <string.h>
 
 extern ncdbT ucis_internal_get_ncdb(ucisT db);
+
+/* Phase 4.2 / M2 — mapping from UCIS_INT_* / UCIS_STR_* enum constants
+ * to the numeric prop IDs in ncdb_props.h. Returns 0 for properties
+ * with no typed-prop ID (caller falls back to attribute storage —
+ * which, post-M2, should be empty for known UCIS properties). */
+static uint16_t ucis_int_to_prop_id(ucisIntPropertyEnumT p) {
+    switch (p) {
+    case UCIS_INT_STMT_INDEX:          return NCDB_PROP_INT_STMT_INDEX;
+    case UCIS_INT_BRANCH_COUNT:        return NCDB_PROP_INT_BRANCH_COUNT;
+    case UCIS_INT_BRANCH_HAS_ELSE:     return NCDB_PROP_INT_BRANCH_HAS_ELSE;
+    case UCIS_INT_BRANCH_ISCASE:       return NCDB_PROP_INT_BRANCH_ISCASE;
+    case UCIS_INT_FSM_STATEVAL:        return NCDB_PROP_INT_FSM_STATEVAL;
+    case UCIS_INT_CVG_AUTOBINMAX:      return NCDB_PROP_INT_CVG_AUTOBINMAX;
+    case UCIS_INT_CVG_DETECTOVERLAP:   return NCDB_PROP_INT_CVG_DETECTOVERLAP;
+    case UCIS_INT_CVG_NUMPRINTMISSING: return NCDB_PROP_INT_CVG_NUMPRINTMISSING;
+    case UCIS_INT_CVG_STROBE:          return NCDB_PROP_INT_CVG_STROBE;
+    case UCIS_INT_CVG_PERINSTANCE:     return NCDB_PROP_INT_CVG_PERINSTANCE;
+    case UCIS_INT_CVG_GETINSTCOV:      return NCDB_PROP_INT_CVG_GETINSTCOV;
+    case UCIS_INT_CVG_MERGEINSTANCES:  return NCDB_PROP_INT_CVG_MERGEINSTANCES;
+    default: return 0;
+    }
+}
+
+static uint16_t ucis_str_to_prop_id(ucisStringPropertyEnumT p) {
+    switch (p) {
+    case UCIS_STR_GENERIC:           return NCDB_PROP_STR_GENERIC;
+    case UCIS_STR_TEST_NAME:         return NCDB_PROP_STR_TEST_NAME;
+    case UCIS_STR_TEST_HOSTNAME:     return NCDB_PROP_STR_TEST_HOSTNAME;
+    case UCIS_STR_TEST_HOSTOS:       return NCDB_PROP_STR_TEST_HOSTOS;
+    case UCIS_STR_DESIGN_VERSION_ID: return NCDB_PROP_STR_DESIGN_VERSION_ID;
+    case UCIS_STR_FSM_STATEVAR:      return NCDB_PROP_STR_FSM_STATEVAR;
+    case UCIS_STR_UNIQUE_ID_ALIAS:   return NCDB_PROP_STR_UNIQUE_ID_ALIAS;
+    default: return 0;
+    }
+}
+
 
 /* History-node detection: NCDB stores history nodes in a flat array on the
  * db; we identify obj as a history node iff it's reachable from db->history.
@@ -131,16 +168,20 @@ int ucis_SetIntProperty(ucisT                 db,
     /* Coveritem properties */
     if (obj && coverindex >= 0) {
         ncdbScopeT s = (ncdbScopeT)obj;
-        if ((size_t)coverindex >= s->cover_count) return -1;
-        ncdbCoverT c = s->covers[coverindex];
+        ncdbCoverT c = ncdb_scope_logical_cover_at(s, (size_t)coverindex);
+        if (!c) return -1;
         switch (property) {
         case UCIS_INT_COVER_GOAL:    return ncdb_SetCoverGoal  (core, c, (int64_t)value);
         case UCIS_INT_COVER_WEIGHT:  return ncdb_SetCoverWeight(core, c, (uint64_t)value);
         case UCIS_INT_COVER_LIMIT:   c->at_least = (uint64_t)value; return 0;
         default: break;
         }
-        const char *k = int_prop_name(property);
-        return k ? attr_set_int(core, s, coverindex, k, value) : -1;
+        /* Phase 4.2 / M2: long-tail goes into the typed-property block. */
+        {
+            uint16_t pid = ucis_int_to_prop_id(property);
+            if (pid) return ncdb_prop_table_set_int32(&c->props, pid, value);
+        }
+        return -1;
     }
 
     /* Scope properties */
@@ -156,13 +197,19 @@ int ucis_SetIntProperty(ucisT                 db,
         case UCIS_INT_CVG_ATLEAST:         s->at_least = (uint64_t)value; return 0;
         default: break;
         }
-        const char *k = int_prop_name(property);
-        return k ? attr_set_int(core, s, -1, k, value) : -1;
+        {
+            uint16_t pid = ucis_int_to_prop_id(property);
+            if (pid) return ncdb_prop_table_set_int32(&s->props, pid, value);
+        }
+        return -1;
     }
 
-    /* DB-level */
-    const char *k = int_prop_name(property);
-    return k ? attr_set_int(core, NULL, -1, k, value) : -1;
+    /* DB-level long-tail still goes into the DB attribute table (no
+     * per-DB typed-prop block in v4 — M2 covers scope/cover only). */
+    {
+        const char *k = int_prop_name(property);
+        return k ? attr_set_int(core, NULL, -1, k, value) : -1;
+    }
 }
 
 /* ====================================================================== */
@@ -191,29 +238,45 @@ int ucis_GetIntProperty(ucisT                 db,
     }
     if (coverindex >= 0) {
         ncdbScopeT s = (ncdbScopeT)obj;
-        if ((size_t)coverindex >= s->cover_count) return -1;
-        ncdbCoverT c = s->covers[coverindex];
+        ncdbCoverT c = ncdb_scope_logical_cover_at(s, (size_t)coverindex);
+        if (!c) return -1;
         switch (property) {
         case UCIS_INT_COVER_GOAL:    return (int)ncdb_GetCoverGoal  (core, c);
         case UCIS_INT_COVER_WEIGHT:  return (int)ncdb_GetCoverWeight(core, c);
         case UCIS_INT_COVER_LIMIT:   return (int)c->at_least;
-        default: return -1;
+        default: break;
         }
+        {
+            uint16_t pid = ucis_int_to_prop_id(property);
+            int64_t out;
+            if (pid && ncdb_prop_table_get_int(&c->props, pid, &out) == 0)
+                return (int)out;
+        }
+        return -1;
     }
     /* Scope */
-    ncdbScopeT s = (ncdbScopeT)obj;
-    switch (property) {
-    case UCIS_INT_SCOPE_WEIGHT:               return (int)ncdb_GetScopeWeight(core, s);
-    case UCIS_INT_SCOPE_GOAL:                 return (int)ncdb_GetScopeGoal  (core, s);
-    case UCIS_INT_SCOPE_SOURCE_TYPE:          return s->source_type;
-    case UCIS_INT_TOGGLE_TYPE:                return ncdb_GetToggleType  (core, s);
-    case UCIS_INT_TOGGLE_DIR:                 return ncdb_GetToggleDir   (core, s);
-    case UCIS_INT_TOGGLE_METRIC:              return ncdb_GetToggleMetric(core, s);
-    case UCIS_INT_SCOPE_NUM_COVERITEMS:       return (int)s->cover_count;
-    case UCIS_INT_NUM_CROSSED_CVPS:           return (int)s->crossed_count;
-    case UCIS_INT_SCOPE_IS_UNDER_DU:          return s->du_scope ? 1 : 0;
-    case UCIS_INT_CVG_ATLEAST:                return (int)s->at_least;
-    default: return -1;
+    {
+        ncdbScopeT s = (ncdbScopeT)obj;
+        switch (property) {
+        case UCIS_INT_SCOPE_WEIGHT:               return (int)ncdb_GetScopeWeight(core, s);
+        case UCIS_INT_SCOPE_GOAL:                 return (int)ncdb_GetScopeGoal  (core, s);
+        case UCIS_INT_SCOPE_SOURCE_TYPE:          return s->source_type;
+        case UCIS_INT_TOGGLE_TYPE:                return ncdb_GetToggleType  (core, s);
+        case UCIS_INT_TOGGLE_DIR:                 return ncdb_GetToggleDir   (core, s);
+        case UCIS_INT_TOGGLE_METRIC:              return ncdb_GetToggleMetric(core, s);
+        case UCIS_INT_SCOPE_NUM_COVERITEMS:       return (int)s->cover_count;
+        case UCIS_INT_NUM_CROSSED_CVPS:           return (int)s->crossed_count;
+        case UCIS_INT_SCOPE_IS_UNDER_DU:          return s->du_scope ? 1 : 0;
+        case UCIS_INT_CVG_ATLEAST:                return (int)s->at_least;
+        default: break;
+        }
+        {
+            uint16_t pid = ucis_int_to_prop_id(property);
+            int64_t out;
+            if (pid && ncdb_prop_table_get_int(&s->props, pid, &out) == 0)
+                return (int)out;
+        }
+        return -1;
     }
 }
 
@@ -266,23 +329,32 @@ int ucis_SetStringProperty(ucisT                    db,
     /* Coveritem */
     if (coverindex >= 0) {
         ncdbScopeT s = (ncdbScopeT)obj;
-        if ((size_t)coverindex >= s->cover_count) return -1;
+        ncdbCoverT c = ncdb_scope_logical_cover_at(s, (size_t)coverindex);
+        if (!c) return -1;
         if (property == UCIS_STR_COMMENT)
-            return ncdb_SetCoverComment(core, s->covers[coverindex], value);
-        const char *k = str_prop_name(property);
-        return k ? attr_set_str(core, s, coverindex, k, value) : -1;
+            return ncdb_SetCoverComment(core, c, value);
+        {
+            uint16_t pid = ucis_str_to_prop_id(property);
+            if (pid) return ncdb_prop_table_set_string(&c->props, pid, value);
+        }
+        return -1;
     }
 
     /* Scope */
-    ncdbScopeT s = (ncdbScopeT)obj;
-    switch (property) {
-    case UCIS_STR_DU_SIGNATURE:     return ncdb_SetDUSignature        (core, s, value);
-    case UCIS_STR_TOGGLE_CANON_NAME:return ncdb_SetToggleCanonicalName(core, s, value);
-    case UCIS_STR_EXPR_TERMS:       return ncdb_SetCoverpointExprTerms(core, s, value);
-    default: break;
+    {
+        ncdbScopeT s = (ncdbScopeT)obj;
+        switch (property) {
+        case UCIS_STR_DU_SIGNATURE:     return ncdb_SetDUSignature        (core, s, value);
+        case UCIS_STR_TOGGLE_CANON_NAME:return ncdb_SetToggleCanonicalName(core, s, value);
+        case UCIS_STR_EXPR_TERMS:       return ncdb_SetCoverpointExprTerms(core, s, value);
+        default: break;
+        }
+        {
+            uint16_t pid = ucis_str_to_prop_id(property);
+            if (pid) return ncdb_prop_table_set_string(&s->props, pid, value);
+        }
+        return -1;
     }
-    const char *k = str_prop_name(property);
-    return k ? attr_set_str(core, s, -1, k, value) : -1;
 }
 
 /* ====================================================================== */
@@ -327,22 +399,33 @@ const char *ucis_GetStringProperty(ucisT                    db,
     }
     if (coverindex >= 0) {
         ncdbScopeT s = (ncdbScopeT)obj;
-        if ((size_t)coverindex >= s->cover_count) return NULL;
-        ncdbCoverT c = s->covers[coverindex];
+        ncdbCoverT c = ncdb_scope_logical_cover_at(s, (size_t)coverindex);
+        if (!c) return NULL;
         if (property == UCIS_STR_COMMENT) return ncdb_GetCoverComment(core, c);
+        {
+            uint16_t pid = ucis_str_to_prop_id(property);
+            if (pid) return ncdb_prop_table_get_string(&c->props, pid);
+        }
         return NULL;
     }
-    ncdbScopeT s = (ncdbScopeT)obj;
-    switch (property) {
-    case UCIS_STR_SCOPE_NAME:        return ncdb_GetScopeName        (core, s);
-    case UCIS_STR_DU_SIGNATURE:      return ncdb_GetDUSignature      (core, s);
-    case UCIS_STR_TOGGLE_CANON_NAME: return ncdb_GetToggleCanonicalName(core, s);
-    case UCIS_STR_EXPR_TERMS:        return ncdb_GetCoverpointExprTerms(core, s);
-    case UCIS_STR_INSTANCE_DU_NAME: {
-        ncdbScopeT du = ncdb_GetScopeDU(core, s);
-        return du ? ncdb_GetScopeName(core, du) : NULL;
-    }
-    default: return NULL;
+    {
+        ncdbScopeT s = (ncdbScopeT)obj;
+        switch (property) {
+        case UCIS_STR_SCOPE_NAME:        return ncdb_GetScopeName        (core, s);
+        case UCIS_STR_DU_SIGNATURE:      return ncdb_GetDUSignature      (core, s);
+        case UCIS_STR_TOGGLE_CANON_NAME: return ncdb_GetToggleCanonicalName(core, s);
+        case UCIS_STR_EXPR_TERMS:        return ncdb_GetCoverpointExprTerms(core, s);
+        case UCIS_STR_INSTANCE_DU_NAME: {
+            ncdbScopeT du = ncdb_GetScopeDU(core, s);
+            return du ? ncdb_GetScopeName(core, du) : NULL;
+        }
+        default: break;
+        }
+        {
+            uint16_t pid = ucis_str_to_prop_id(property);
+            if (pid) return ncdb_prop_table_get_string(&s->props, pid);
+        }
+        return NULL;
     }
 }
 

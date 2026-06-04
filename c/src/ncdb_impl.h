@@ -10,7 +10,7 @@
 #include "ncdb/ncdb.h"
 
 #define NCDB_FORMAT "NCDB"
-#define NCDB_VERSION "3.0"  /* Phase 1.11: binary manifests, UCIS fields, per-DU files, tags, etc. */
+#define NCDB_VERSION "4.0"  /* Phase 4.9: typed props, NUID, NTAS, NFRM, NMTR, NTRL, R7 fix. */
 #define NCDB_GENERATOR "ncdb-c"
 #define NCDB_HISTORY_FORMAT_V1 "v1"
 
@@ -27,6 +27,10 @@
 #define NCDB_MEMBER_ISSUES     "issues.bin"
 #define NCDB_MEMBER_ISSUES_HISTORY "issues_history.bin"
 #define NCDB_MEMBER_TAGS       "tags.bin"
+#define NCDB_MEMBER_UNIQUE_ID  "unique_id_index.bin"   /* Phase 4.3 / M3 */
+#define NCDB_MEMBER_TESTS_ASSOC "tests_assoc.bin"      /* Phase 4.4 / M4 */
+#define NCDB_MEMBER_FORMAL      "formal.bin"           /* Phase 4.5 / M5 */
+#define NCDB_MEMBER_METRICS     "metrics.bin"          /* Phase 4.6 / M6 */
 
 #define NCDB_SCOPE_MARKER_REGULAR     0x00
 #define NCDB_SCOPE_MARKER_TOGGLE_PAIR 0x01
@@ -42,14 +46,41 @@
 #define NCDB_PRESENCE_EXT_COVERS  0x100  /* Phase 1.5: per-cover extended fields */
 #define NCDB_PRESENCE_EXPR_TERMS  0x200  /* Phase 1.9: coverpoint expression terms */
 #define NCDB_PRESENCE_DU_FILES    0x400  /* Phase 1.8: per-DU file index list */
+#define NCDB_PRESENCE_TYPED_PROPS 0x1000 /* Phase 4.2 / M2: scope-level typed-property block */
 
 #define NCDB_COUNTS_MODE_UINT32 0
 #define NCDB_COUNTS_MODE_VARINT 1
+
+/* Phase 4.1 / M1 — R7 fix: synthetic per-bin-type child scopes.
+ *
+ * When a caller would add covers of multiple distinct types under one
+ * parent scope (the assertion / cover-property cases where UCIS allows
+ * PASS+FAIL+ATTEMPT+ACTIVE+... siblings), `ncdb_impl_create_cover` keeps
+ * the first cover's type on the parent and reparents subsequent
+ * different-typed covers into synthetic children, one per bin-type.
+ *
+ * Each synthetic child carries:
+ *   - the parent's UCIS scope type (preserves type-filtered iteration),
+ *   - `UCIS_SCOPE_INTERNAL` set in its flags so UCIS readers filter it,
+ *   - `NCDB_SCOPE_FLAG_R7_SYNTHETIC` set (a single bit within
+ *     UCIS_SCOPE_INTERNAL's reserved nibble) so we can detect "this is
+ *     an R7-split synthetic" specifically, vs. a user-internal scope,
+ *   - a name like `<pass>` / `<fail>` / `<bintype_0xNN>`.
+ *
+ * The on-disk `scope_tree.bin` format is unchanged — synthetics
+ * serialize as regular child scopes. Readers that respect
+ * UCIS_SCOPE_INTERNAL flatten transparently on iteration.
+ *
+ * Bit values mirror the UCIS spec (§6, scope flags); core NCDB defines
+ * its own copy so it doesn't have to depend on the UCIS shim header. */
+#define NCDB_SCOPE_FLAG_INTERNAL     0xF0000000U  /* UCIS_SCOPE_INTERNAL */
+#define NCDB_SCOPE_FLAG_R7_SYNTHETIC 0x10000000U  /* bit within INTERNAL */
 
 #define NCDB_TOGGLE_BIN_0_TO_1 "0 -> 1"
 #define NCDB_TOGGLE_BIN_1_TO_0 "1 -> 0"
 
 typedef struct ncdb_issues_s ncdb_issues_t;
+typedef struct ncdb_nuid_index_s ncdb_nuid_index_t;
 
 typedef struct ncdb_buf_s {
     uint8_t *data;
@@ -81,6 +112,26 @@ typedef struct ncdb_attr_table_s {
     size_t cap;
 } ncdb_attr_table_t;
 
+/* Phase 4.2 / M2 — typed-property table. Numeric-keyed sibling of the
+ * attribute table, used for known UCIS properties to dodge the
+ * string-key overhead. */
+typedef struct ncdb_prop_entry_s {
+    uint16_t prop_id;      /* see ncdb_props.h */
+    uint8_t  type_tag;     /* NCDB_PROP_TYPE_* */
+    union {
+        int32_t  i32;
+        int64_t  i64;
+        double   d;
+        char    *str;      /* owned (NCDB_PROP_TYPE_STRING) */
+    } v;
+} ncdb_prop_entry_t;
+
+typedef struct ncdb_prop_table_s {
+    ncdb_prop_entry_t *entries;
+    size_t count;
+    size_t cap;
+} ncdb_prop_table_t;
+
 typedef struct ncdb_manifest_s {
     char *format;
     char *version;
@@ -100,6 +151,16 @@ typedef struct ncdb_manifest_s {
     char *vendor_tool;
     char *vendor_tool_version;
     char *ucis_standard;
+    /* v4 schema version fields (Phase 4.8 / M8). Numeric replacement for
+     * the legacy stringy `version` field; readers compare these instead.
+     * v3 fixtures (manifest binary v1) deserialize with major=3, minor=0,
+     * feature_flags=0, n_history_nodes/n_associations derived from existing
+     * data. */
+    uint32_t schema_version_major;
+    uint32_t schema_version_minor;
+    uint64_t feature_flags;
+    uint64_t n_history_nodes;
+    uint64_t n_associations;
 } ncdbManifest;
 
 struct ncdb_cover_s {
@@ -117,13 +178,21 @@ struct ncdb_cover_s {
     int64_t  goal;              /* -1 = use parent's */
     char    *comment;           /* owned */
     ncdb_attr_table_t attrs;
+    ncdb_prop_table_t props;    /* Phase 4.2 / M2 */
+    /* Phase 4.4 / M4 — sorted list of "real-test slot indices" for
+     * history-node↔coveritem association. NULL when no associations
+     * recorded (the common case). Slot indices are positions in the
+     * db-level real_tests vector, not raw history-node array indices,
+     * so MERGE nodes are excluded by construction. */
+    struct ncdb_assoc_s *assoc;
 };
 
-#define NCDB_COVER_PRESENCE_SOURCE   0x01U
-#define NCDB_COVER_PRESENCE_WEIGHT   0x02U
-#define NCDB_COVER_PRESENCE_GOAL     0x04U
-#define NCDB_COVER_PRESENCE_COMMENT  0x08U
-#define NCDB_COVER_PRESENCE_AT_LEAST 0x10U
+#define NCDB_COVER_PRESENCE_SOURCE      0x01U
+#define NCDB_COVER_PRESENCE_WEIGHT      0x02U
+#define NCDB_COVER_PRESENCE_GOAL        0x04U
+#define NCDB_COVER_PRESENCE_COMMENT     0x08U
+#define NCDB_COVER_PRESENCE_AT_LEAST    0x10U
+#define NCDB_COVER_PRESENCE_TYPED_PROPS 0x20U  /* Phase 4.2 / M2 */
 
 struct ncdb_scope_s {
     struct ncdb_scope_s *parent;
@@ -174,6 +243,7 @@ struct ncdb_scope_s {
     char **tags;
     size_t tag_count;
     size_t tag_cap;
+    ncdb_prop_table_t props;    /* Phase 4.2 / M2 */
 };
 
 struct ncdb_fsm_state_s {
@@ -231,6 +301,30 @@ struct ncdb_s {
     char *vendor_tool;
     char *vendor_tool_version;
     char *ucis_standard;
+    /* v4 feature flags (Phase 4.8 / M8). Each member writer sets its
+     * NCDB_FEATURE_* bit during serialize so the manifest reflects what's
+     * actually on disk. Reset to 0 by ncdb_impl_reset_db. */
+    uint64_t feature_flags;
+    /* Loaded NUID index (Phase 4.3 / M3). NULL when no index is on disk
+     * or after reset. Freed by ncdb_Close. */
+    ncdb_nuid_index_t *nuid_idx;
+    /* Formal records (Phase 4.5 / M5). Sparse array of per-scope formal
+     * status / radius / witness. Owned. */
+    struct ncdb_formal_record_s *formal_records;
+    size_t formal_record_count;
+    size_t formal_record_cap;
+    /* Metric definitions (Phase 4.6 / M6). Tiny table — one record per
+     * UCIS metric the tool supports. */
+    struct ncdb_metric_def_s *metrics;
+    size_t metric_count;
+    size_t metric_cap;
+    /* DU-name → scope index (Phase 4.7 / M7), sorted by name for
+     * bsearch. Built from the scope_tree.bin trailer on read. */
+    struct ncdb_du_lookup_s {
+        char       *name;       /* owned */
+        ncdbScopeT  scope;
+    } *du_lookup;
+    size_t du_lookup_count;
 };
 
 typedef struct ncdb_zip_member_s {
@@ -306,6 +400,30 @@ int  ncdb_attr_table_get(const ncdb_attr_table_t *t, const char *key, ncdbAttrVa
 int  ncdb_attr_table_iterate(const ncdb_attr_table_t *t,
                              int (*cb)(const char *, const ncdbAttrValue *, void *),
                              void *ud);
+/* Phase 4.1 / M1 — logical cover view (flatten R7 synthetic children). */
+size_t      ncdb_scope_logical_cover_count(ncdbScopeT scope);
+ncdbCoverT  ncdb_scope_logical_cover_at(ncdbScopeT scope, size_t idx);
+
+/* Phase 4.2 / M2 — typed-property table. */
+void  ncdb_prop_table_init(ncdb_prop_table_t *t);
+void  ncdb_prop_table_free(ncdb_prop_table_t *t);
+int   ncdb_prop_table_set_int32 (ncdb_prop_table_t *t, uint16_t id, int32_t v);
+int   ncdb_prop_table_set_int64 (ncdb_prop_table_t *t, uint16_t id, int64_t v);
+int   ncdb_prop_table_set_double(ncdb_prop_table_t *t, uint16_t id, double v);
+int   ncdb_prop_table_set_string(ncdb_prop_table_t *t, uint16_t id, const char *s);
+/* Getters return 0 on success, -1 if the prop isn't set. */
+int          ncdb_prop_table_get_int   (const ncdb_prop_table_t *t, uint16_t id, int64_t *out);
+int          ncdb_prop_table_get_double(const ncdb_prop_table_t *t, uint16_t id, double  *out);
+const char  *ncdb_prop_table_get_string(const ncdb_prop_table_t *t, uint16_t id);
+int          ncdb_prop_table_remove    (ncdb_prop_table_t *t, uint16_t id);
+/* Serialize/deserialize a typed-property block (no magic — caller's
+ * presence bit gates the block). Strings flow through `strings`. */
+int  ncdb_prop_table_serialize  (const ncdb_prop_table_t *t,
+                                 ncdbStringTable *strings, ncdbBuf *out);
+int  ncdb_prop_table_deserialize(ncdb_prop_table_t *t,
+                                 const uint8_t *data, size_t size, size_t *off,
+                                 const ncdbStringTable *strings);
+
 /* DFS scope index: walk in canonical order matching scope_tree.bin */
 int  ncdb_impl_scope_dfs_index(ncdbT db, ncdbScopeT target, size_t *out_idx);
 ncdbScopeT ncdb_impl_scope_by_dfs_index(ncdbT db, size_t idx);
@@ -313,6 +431,77 @@ int  ncdb_impl_history_index(ncdbT db, ncdbHistoryNodeT h, size_t *out_idx);
 /* Allocate and fill a flat DFS-ordered scope array. Caller frees *out via free(). */
 int  ncdb_impl_dfs_flatten(ncdbT db, ncdbScopeT **out, size_t *out_count);
 int ncdb_toggle_deserialize(ncdbT db, const uint8_t *data, size_t size, char *errbuf, size_t errbuf_sz);
+
+/* Phase 4.3 / M3 — unique-ID computation + NUID index. */
+uint64_t ncdb_xxh64(const void *input, size_t len, uint64_t seed);
+int      ncdb_compute_unique_id(ncdbT db, ncdbScopeT scope,
+                                char *buf, size_t bufsz);
+
+int    ncdb_unique_id_index_serialize  (ncdbT db, ncdbBuf *out);
+
+/* Phase 4.4 / M4 — tests↔coveritem association.
+ *
+ * Build-time storage on ncdb_cover_s::assoc is a sorted dedupe'd vector
+ * of "real-test slot indices" — positions in the per-DB real_tests
+ * list (history nodes of kind TEST/NONE; MERGE nodes are derivable on
+ * read and never stored). The writer caller drives this via
+ * ncdb_AssocCoverHistory which translates a history-node pointer into
+ * its real-test slot. */
+struct ncdb_assoc_s {
+    uint32_t *slots;    /* sorted, dedupe'd */
+    size_t    count;
+    size_t    cap;
+};
+void   ncdb_assoc_free(struct ncdb_assoc_s *a);
+int    ncdb_tests_assoc_serialize  (ncdbT db, ncdbBuf *out);
+int    ncdb_tests_assoc_deserialize(ncdbT db, const uint8_t *data, size_t size,
+                                    char *errbuf, size_t errbuf_sz);
+
+/* Phase 4.5 / M5 — per-scope formal-verification record. */
+struct ncdb_formal_record_s {
+    ncdbScopeT scope;        /* target (scope only for now; cover-level deferred) */
+    uint32_t   presence;     /* bit0=status, bit1=radius, bit2=witness */
+    uint8_t    status;       /* ucisFormalStatusT */
+    int64_t    radius;
+    char      *witness;      /* owned, NUL-terminated */
+};
+int     ncdb_formal_set_status (ncdbT db, ncdbScopeT s, uint8_t status);
+int     ncdb_formal_get_status (ncdbT db, ncdbScopeT s);   /* -1 if unset */
+int     ncdb_formal_set_radius (ncdbT db, ncdbScopeT s, int64_t radius);
+int64_t ncdb_formal_get_radius (ncdbT db, ncdbScopeT s);   /* INT64_MIN if unset */
+int     ncdb_formal_set_witness(ncdbT db, ncdbScopeT s, const char *witness);
+const char *ncdb_formal_get_witness(ncdbT db, ncdbScopeT s);
+int     ncdb_formal_serialize  (ncdbT db, ncdbBuf *out);
+int     ncdb_formal_deserialize(ncdbT db, const uint8_t *data, size_t size,
+                                char *errbuf, size_t errbuf_sz);
+void    ncdb_formal_free       (ncdbT db);   /* frees records array */
+
+/* Phase 4.6 / M6 — metric definitions (UCIS metric naming model, §4.9). */
+struct ncdb_metric_def_s {
+    uint32_t metric_id;
+    char    *name;            /* owned, UCIS URL-style metric identifier */
+    uint8_t  mode;            /* UCIS METRIC_MODE enum */
+    uint64_t target_type_mask; /* scope types this metric applies to */
+};
+int    ncdb_metric_add        (ncdbT db, uint32_t id, const char *name,
+                               uint8_t mode, uint64_t target_type_mask);
+size_t ncdb_metric_count      (ncdbT db);
+const struct ncdb_metric_def_s *ncdb_metric_get(ncdbT db, size_t idx);
+/* Phase 4.7 / M7 — bsearch the DU-name index loaded from the
+ * scope_tree.bin trailer. Returns NULL when no trailer was present or
+ * `name` doesn't match a DU. */
+ncdbScopeT ncdb_match_du_by_name(ncdbT db, const char *name);
+
+int    ncdb_metric_serialize  (ncdbT db, ncdbBuf *out);
+int    ncdb_metric_deserialize(ncdbT db, const uint8_t *data, size_t size,
+                               char *errbuf, size_t errbuf_sz);
+void   ncdb_metric_free       (ncdbT db);
+int    ncdb_unique_id_index_deserialize(const uint8_t *data, size_t size,
+                                        ncdb_nuid_index_t **out_idx,
+                                        char *errbuf, size_t errbuf_sz);
+void   ncdb_unique_id_index_free       (ncdb_nuid_index_t *idx);
+size_t ncdb_unique_id_index_lookup     (const ncdb_nuid_index_t *idx,
+                                        uint64_t hash);
 int ncdb_cross_deserialize(ncdbT db, const uint8_t *data, size_t size, char *errbuf, size_t errbuf_sz);
 int ncdb_fsm_deserialize(ncdbT db, const uint8_t *data, size_t size, char *errbuf, size_t errbuf_sz);
 

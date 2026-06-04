@@ -54,9 +54,17 @@ class Manifest:
     vendor_tool:         str = ""
     vendor_tool_version: str = ""
     ucis_standard:       str = ""
+    # v4 schema-version fields (Phase 4.8 / M8). Default values match a v3
+    # fixture: numeric schema 3.0, no v4 features, derived counts at zero.
+    schema_version_major: int = 3
+    schema_version_minor: int = 0
+    feature_flags:        int = 0
+    n_history_nodes:      int = 0
+    n_associations:       int = 0
 
     _MAGIC = b"NMAN"
-    _BIN_VERSION = 1
+    _BIN_VERSION = 2   # v2 = M8 (Phase 4.8)
+    _BIN_VERSION_V1 = 1  # legacy; still accepted on deserialize
     _BIN_STRINGS = (
         "format", "version", "ucis_version", "created", "path_separator",
         "schema_hash", "generator", "history_format",
@@ -76,6 +84,12 @@ class Manifest:
             out += _enc_varint(len(s)); out += s
         for attr in self._BIN_NUMBERS:
             out += _enc_varint(int(getattr(self, attr) or 0))
+        # v2 extension
+        out += int(self.schema_version_major).to_bytes(4, "little")
+        out += int(self.schema_version_minor).to_bytes(4, "little")
+        out += int(self.feature_flags).to_bytes(8, "little")
+        out += _enc_varint(int(self.n_history_nodes))
+        out += _enc_varint(int(self.n_associations))
         return bytes(out)
 
     @classmethod
@@ -93,7 +107,7 @@ class Manifest:
     def _from_binary(cls, data: bytes) -> "Manifest":
         o = 4
         version = data[o]; o += 1
-        if version != cls._BIN_VERSION:
+        if version not in (cls._BIN_VERSION, cls._BIN_VERSION_V1):
             raise ValueError(f"unsupported manifest binary version {version}")
         m = cls()
         for attr in cls._BIN_STRINGS:
@@ -102,6 +116,19 @@ class Manifest:
         for attr in cls._BIN_NUMBERS:
             v, o = _dec_varint(data, o)
             setattr(m, attr, v)
+        if version >= cls._BIN_VERSION:
+            m.schema_version_major = int.from_bytes(data[o:o + 4], "little"); o += 4
+            m.schema_version_minor = int.from_bytes(data[o:o + 4], "little"); o += 4
+            m.feature_flags        = int.from_bytes(data[o:o + 8], "little"); o += 8
+            m.n_history_nodes, o   = _dec_varint(data, o)
+            m.n_associations, o    = _dec_varint(data, o)
+        else:
+            # v1 binary: synthesize uniform defaults so consumers can compare numerically.
+            m.schema_version_major = 3
+            m.schema_version_minor = 0
+            m.feature_flags        = 0
+            m.n_history_nodes      = m.test_count
+            m.n_associations       = 0
         return m
 
     @staticmethod

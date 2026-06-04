@@ -58,7 +58,11 @@ int ucis_CreateNextCover(ucisT             db,
                             (uint64_t)sourceinfo->token);
     }
 
-    return (int)(scope->cover_count - 1U);
+    /* Phase 4.1 / M1: return the *logical* index (flat view across
+     * parent + R7 synthetic children) so the caller can pass it back to
+     * IncrementCover / SetCoverFlag transparently regardless of whether
+     * the writer reparented the cover into a synthetic child. */
+    return (int)(ncdb_scope_logical_cover_count(scope) - 1U);
 }
 
 int ucis_IncrementCover(ucisT       db,
@@ -66,11 +70,11 @@ int ucis_IncrementCover(ucisT       db,
                         int         coverindex,
                         int64_t     increment)
 {
+    ncdbCoverT c;
     (void)db;
     if (!parent || coverindex < 0) return -1;
-    ncdbScopeT scope = (ncdbScopeT)parent;
-    if ((size_t)coverindex >= scope->cover_count) return -1;
-    ncdbCoverT c = scope->covers[coverindex];
+    c = ncdb_scope_logical_cover_at((ncdbScopeT)parent, (size_t)coverindex);
+    if (!c) return -1;
     /* UCIS spec 8.4.11: increment is undefined for vector coveritems
      * (they don't carry a scalar count). Reject explicitly. */
     if (c->flags & UCIS_IS_VECTOR) return -1;
@@ -84,12 +88,13 @@ void ucis_SetCoverFlag(ucisT       db,
                        ucisFlagsT  mask,
                        int         bitvalue)
 {
+    ncdbCoverT c;
     (void)db;
     if (!parent || coverindex < 0) return;
-    ncdbScopeT scope = (ncdbScopeT)parent;
-    if ((size_t)coverindex >= scope->cover_count) return;
-    if (bitvalue) scope->covers[coverindex]->flags |=  (uint32_t)mask;
-    else          scope->covers[coverindex]->flags &= ~(uint32_t)mask;
+    c = ncdb_scope_logical_cover_at((ncdbScopeT)parent, (size_t)coverindex);
+    if (!c) return;
+    if (bitvalue) c->flags |=  (uint32_t)mask;
+    else          c->flags &= ~(uint32_t)mask;
 }
 
 int ucis_GetCoverSourceInfo(ucisT             db,
@@ -99,11 +104,12 @@ int ucis_GetCoverSourceInfo(ucisT             db,
 {
     ucis_ctx_t *ctx = ucis_ctx_of(db);
     ncdbT core = ucis_internal_get_ncdb(db);
+    ncdbCoverT c;
+    const char *path;
     if (!ctx || !core || !parent || coverindex < 0 || !si) return -1;
-    ncdbScopeT scope = (ncdbScopeT)parent;
-    if ((size_t)coverindex >= scope->cover_count) return -1;
-    ncdbCoverT c = scope->covers[coverindex];
-    const char *path = ncdb_GetCoverSourcePath(core, c);
+    c = ncdb_scope_logical_cover_at((ncdbScopeT)parent, (size_t)coverindex);
+    if (!c) return -1;
+    path = ncdb_GetCoverSourcePath(core, c);
     if (!path || !path[0]) return -1;
     si->filehandle = (ucisFileHandleT)ucis_internal_handle_for_path(ctx, path);
     si->line  = (int)ncdb_GetCoverSourceLine (core, c);

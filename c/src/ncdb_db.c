@@ -12,6 +12,8 @@ static void free_scope(ncdbScopeT scope) {
     if (!scope) return;
     for (i = 0; i < scope->cover_count; i++) {
         ncdb_attr_table_free(&scope->covers[i]->attrs);
+        ncdb_prop_table_free(&scope->covers[i]->props);
+        ncdb_assoc_free(scope->covers[i]->assoc);
         free(scope->covers[i]->name);
         free(scope->covers[i]->source_path);
         free(scope->covers[i]->comment);
@@ -21,6 +23,7 @@ static void free_scope(ncdbScopeT scope) {
         free_scope(scope->children[i]);
     }
     ncdb_attr_table_free(&scope->attrs);
+    ncdb_prop_table_free(&scope->props);
     free(scope->covers);
     free(scope->children);
     free(scope->crossed_points);  /* array only — pointed-to scopes are owned elsewhere */
@@ -123,6 +126,19 @@ void ncdb_impl_reset_db(ncdbT db) {
     ncdb_issues_free(db->issues); db->issues = NULL;
     free(db->issues_hist_data); db->issues_hist_data = NULL; db->issues_hist_len = 0;
     ncdb_attr_table_free(&db->attrs);
+    ncdb_unique_id_index_free(db->nuid_idx);
+    db->nuid_idx = NULL;
+    ncdb_formal_free(db);
+    ncdb_metric_free(db);
+    /* Phase 4.7 / M7 — free DU-name lookup loaded from scope-tree trailer. */
+    if (db->du_lookup) {
+        size_t k;
+        for (k = 0; k < db->du_lookup_count; k++) free(db->du_lookup[k].name);
+        free(db->du_lookup);
+        db->du_lookup = NULL;
+        db->du_lookup_count = 0;
+    }
+    db->feature_flags = 0;
 }
 
 static int append_ptr(void ***arr, size_t *count, size_t *cap, void *item) {
@@ -154,9 +170,88 @@ ncdbScopeT ncdb_impl_create_scope(ncdbT db, ncdbScopeT parent, uint64_t type, co
     return s;
 }
 
+/* Phase 4.1 / M1 — short human-friendly names for R7 synthetic child
+ * scopes. Return NULL for unknown types; caller falls back to a
+ * `<bintype_0xNN>` form. Names are stable, never reassigned. */
+static const char *r7_bintype_short_name(uint64_t type) {
+    switch (type) {
+    case NCDB_COVER_PASSBIN:       return "<pass>";
+    case NCDB_COVER_FAILBIN:       return "<fail>";
+    case NCDB_COVER_ATTEMPTBIN:    return "<attempt>";
+    case NCDB_COVER_ACTIVEBIN:     return "<active>";
+    case NCDB_COVER_PEAKACTIVEBIN: return "<peakactive>";
+    case NCDB_COVER_VACUOUSBIN:    return "<vacuous>";
+    case NCDB_COVER_DISABLEDBIN:   return "<disabled>";
+    case NCDB_COVER_COVERBIN:      return "<cover>";
+    case NCDB_COVER_ASSERTBIN:     return "<assert>";
+    case NCDB_COVER_STMTBIN:       return "<stmt>";
+    case NCDB_COVER_BRANCHBIN:     return "<branch>";
+    case NCDB_COVER_EXPRBIN:       return "<expr>";
+    case NCDB_COVER_CONDBIN:       return "<cond>";
+    case NCDB_COVER_TOGGLEBIN:     return "<toggle>";
+    case NCDB_COVER_FSMBIN:        return "<fsm>";
+    case NCDB_COVER_USERBIN:       return "<user>";
+    case NCDB_COVER_CVGBIN:        return "<cvg>";
+    case NCDB_COVER_IGNOREBIN:     return "<ignore>";
+    case NCDB_COVER_ILLEGALBIN:    return "<illegal>";
+    case NCDB_COVER_DEFAULTBIN:    return "<default>";
+    case NCDB_COVER_BLOCKBIN:      return "<block>";
+    default:                       return NULL;
+    }
+}
+
+/* Find an existing R7 synthetic child of `scope` holding covers of
+ * `type`. Synthetics are distinguished by NCDB_SCOPE_FLAG_R7_SYNTHETIC
+ * and identified by their first cover's type. */
+static ncdbScopeT find_r7_synthetic(ncdbScopeT scope, uint64_t type) {
+    size_t i;
+    for (i = 0; i < scope->child_count; i++) {
+        ncdbScopeT c = scope->children[i];
+        if (!(c->flags & NCDB_SCOPE_FLAG_R7_SYNTHETIC)) continue;
+        if (c->cover_count > 0 && c->covers[0]->type == type) return c;
+    }
+    return NULL;
+}
+
+/* Create a fresh R7 synthetic child of `scope` for `type`. Synthetic
+ * inherits the parent's scope type (preserves type-mask iteration) but
+ * carries the UCIS_SCOPE_INTERNAL flag (so spec-compliant readers
+ * filter it) and our R7-specific marker bit. */
+static ncdbScopeT create_r7_synthetic(ncdbT db, ncdbScopeT scope, uint64_t type) {
+    char namebuf[64];
+    const char *short_name = r7_bintype_short_name(type);
+    ncdbScopeT s;
+    if (short_name) {
+        snprintf(namebuf, sizeof(namebuf), "%s", short_name);
+    } else {
+        snprintf(namebuf, sizeof(namebuf),
+                 "<bintype_0x%llx>", (unsigned long long)type);
+    }
+    s = ncdb_impl_create_scope(db, scope, scope->type, namebuf);
+    if (!s) return NULL;
+    s->flags |= (uint64_t)(NCDB_SCOPE_FLAG_INTERNAL | NCDB_SCOPE_FLAG_R7_SYNTHETIC);
+    return s;
+}
+
 ncdbCoverT ncdb_impl_create_cover(ncdbT db, ncdbScopeT scope, uint64_t type, const char *name, uint64_t count) {
-    ncdbCoverT c = (ncdbCoverT)calloc(1, sizeof(struct ncdb_cover_s));
-    (void)db;
+    ncdbCoverT c;
+    if (!scope) return NULL;
+
+    /* Phase 4.1 / M1: enforce the single-child_cover_type invariant that
+     * scope_tree.bin assumes. If the parent already holds covers of a
+     * different type, reparent the new cover into a synthetic child.
+     * Synthetics themselves never recurse — they hold one type by
+     * construction. */
+    if (scope->cover_count > 0 &&
+        scope->covers[0]->type != type &&
+        !(scope->flags & NCDB_SCOPE_FLAG_R7_SYNTHETIC)) {
+        ncdbScopeT synth = find_r7_synthetic(scope, type);
+        if (!synth) synth = create_r7_synthetic(db, scope, type);
+        if (!synth) return NULL;
+        return ncdb_impl_create_cover(db, synth, type, name, count);
+    }
+
+    c = (ncdbCoverT)calloc(1, sizeof(struct ncdb_cover_s));
     if (!c) return NULL;
     c->parent = scope;
     c->type = type;
@@ -171,6 +266,36 @@ ncdbCoverT ncdb_impl_create_cover(ncdbT db, ncdbScopeT scope, uint64_t type, con
         free(c->name); free(c); return NULL;
     }
     return c;
+}
+
+/* Phase 4.1 / M1 — logical cover view across a parent and its R7
+ * synthetic children. UCIS callers see one flat sequence of covers per
+ * scope, regardless of how many synthetic groups the writer created. */
+
+size_t ncdb_scope_logical_cover_count(ncdbScopeT scope) {
+    size_t total, i;
+    if (!scope) return 0;
+    total = scope->cover_count;
+    for (i = 0; i < scope->child_count; i++) {
+        if (scope->children[i]->flags & NCDB_SCOPE_FLAG_R7_SYNTHETIC) {
+            total += scope->children[i]->cover_count;
+        }
+    }
+    return total;
+}
+
+ncdbCoverT ncdb_scope_logical_cover_at(ncdbScopeT scope, size_t idx) {
+    size_t i;
+    if (!scope) return NULL;
+    if (idx < scope->cover_count) return scope->covers[idx];
+    idx -= scope->cover_count;
+    for (i = 0; i < scope->child_count; i++) {
+        ncdbScopeT child = scope->children[i];
+        if (!(child->flags & NCDB_SCOPE_FLAG_R7_SYNTHETIC)) continue;
+        if (idx < child->cover_count) return child->covers[idx];
+        idx -= child->cover_count;
+    }
+    return NULL;
 }
 
 ncdbHistoryNodeT ncdb_impl_create_history(ncdbT db, uint32_t kind, const char *logical_name, const char *physical_name) {
@@ -325,6 +450,9 @@ int ncdb_Read(ncdbT db, const char *path) {
     if (manifest.vendor_tool && manifest.vendor_tool[0])                 set_owned_str(&db->vendor_tool, manifest.vendor_tool);
     if (manifest.vendor_tool_version && manifest.vendor_tool_version[0]) set_owned_str(&db->vendor_tool_version, manifest.vendor_tool_version);
     if (manifest.ucis_standard && manifest.ucis_standard[0])             set_owned_str(&db->ucis_standard, manifest.ucis_standard);
+    /* Phase 4.8 / M8: propagate the feature_flags bitset off disk so
+     * callers can ask "is the M-foo feature present?" via db->feature_flags. */
+    db->feature_flags = manifest.feature_flags;
     ncdb_strings_init(&strings);
     if (ncdb_strings_deserialize(strings_b, strings_sz, &strings, err, sizeof(err)) != 0 ||
         ncdb_counts_deserialize(counts_b, counts_sz, &counts, &count_count, err, sizeof(err)) != 0 ||
@@ -342,6 +470,45 @@ int ncdb_Read(ncdbT db, const char *path) {
         if (ncdb_zip_read_member(path, NCDB_MEMBER_TAGS, &tags_b, &tags_sz, err, sizeof(err)) == 0)
             ncdb_tags_deserialize(db, tags_b, tags_sz, err, sizeof(err));
         free(tags_b);
+    }
+    /* Phase 4.3 / M3: optional NUID member. Absent on v3 fixtures; v4
+     * writers emit it when scope_count > 0. Failure to parse is
+     * non-fatal — callers that ask for MatchScopeByUniqueID fall back
+     * to O(n) traversal until a rewrite produces a fresh index. */
+    {
+        uint8_t *nuid_b = NULL; size_t nuid_sz = 0;
+        ncdb_unique_id_index_free(db->nuid_idx);
+        db->nuid_idx = NULL;
+        if (ncdb_zip_read_member(path, NCDB_MEMBER_UNIQUE_ID, &nuid_b, &nuid_sz, err, sizeof(err)) == 0) {
+            ncdb_unique_id_index_deserialize(nuid_b, nuid_sz, &db->nuid_idx, err, sizeof(err));
+        }
+        free(nuid_b);
+    }
+    /* Phase 4.4 / M4 — optional NTAS member. Absent on v3 fixtures and on
+     * v4 fixtures that recorded no associations. Failure to parse is
+     * non-fatal here; associations stay empty if NTAS is malformed. */
+    {
+        uint8_t *ntas_b = NULL; size_t ntas_sz = 0;
+        if (ncdb_zip_read_member(path, NCDB_MEMBER_TESTS_ASSOC, &ntas_b, &ntas_sz, err, sizeof(err)) == 0) {
+            ncdb_tests_assoc_deserialize(db, ntas_b, ntas_sz, err, sizeof(err));
+        }
+        free(ntas_b);
+    }
+    /* Phase 4.5 / M5 — optional NFRM member. */
+    {
+        uint8_t *nfrm_b = NULL; size_t nfrm_sz = 0;
+        if (ncdb_zip_read_member(path, NCDB_MEMBER_FORMAL, &nfrm_b, &nfrm_sz, err, sizeof(err)) == 0) {
+            ncdb_formal_deserialize(db, nfrm_b, nfrm_sz, err, sizeof(err));
+        }
+        free(nfrm_b);
+    }
+    /* Phase 4.6 / M6 — optional NMTR member. */
+    {
+        uint8_t *nmtr_b = NULL; size_t nmtr_sz = 0;
+        if (ncdb_zip_read_member(path, NCDB_MEMBER_METRICS, &nmtr_b, &nmtr_sz, err, sizeof(err)) == 0) {
+            ncdb_metric_deserialize(db, nmtr_b, nmtr_sz, err, sizeof(err));
+        }
+        free(nmtr_b);
     }
     {
         uint8_t *issues_b = NULL;
@@ -378,9 +545,9 @@ done:
 
 int ncdb_Write(ncdbT db, const char *path) {
     ncdbStringTable strings;
-    ncdbBuf tree_b, counts_tmp, counts_b, strings_b, manifest_b, history_b, sources_b, attrs_b, cross_b, toggle_b, fsm_b, tags_b;
+    ncdbBuf tree_b, counts_tmp, counts_b, strings_b, manifest_b, history_b, sources_b, attrs_b, cross_b, toggle_b, fsm_b, tags_b, nuid_b, ntas_b, nfrm_b, nmtr_b;
     ncdbManifest manifest;
-    ncdbZipMember members[14];
+    ncdbZipMember members[20];
     size_t member_count = 0;
     uint64_t *counts = NULL;
     size_t count_count = 0;
@@ -395,6 +562,10 @@ int ncdb_Write(ncdbT db, const char *path) {
     ncdb_impl_buf_init(&toggle_b);
     ncdb_impl_buf_init(&fsm_b);
     ncdb_impl_buf_init(&tags_b);
+    ncdb_impl_buf_init(&nuid_b);
+    ncdb_impl_buf_init(&ntas_b);
+    ncdb_impl_buf_init(&nfrm_b);
+    ncdb_impl_buf_init(&nmtr_b);
     ncdb_manifest_init(&manifest);
 
     if (ncdb_strings_add(&strings, "") < 0 ||
@@ -414,6 +585,10 @@ int ncdb_Write(ncdbT db, const char *path) {
         ncdb_toggle_serialize(db, &toggle_b) != 0 ||
         ncdb_fsm_serialize(db, &fsm_b) != 0 ||
         ncdb_tags_serialize(db, &tags_b) != 0 ||
+        ncdb_unique_id_index_serialize(db, &nuid_b) != 0 ||
+        ncdb_tests_assoc_serialize(db, &ntas_b) != 0 ||
+        ncdb_formal_serialize(db, &nfrm_b) != 0 ||
+        ncdb_metric_serialize(db, &nmtr_b) != 0 ||
         ncdb_manifest_build(db, tree_b.data, tree_b.size, counts, count_count, &manifest) != 0 ||
         ncdb_manifest_serialize(&manifest, &manifest_b) != 0) {
         ncdb_impl_set_error(db, "%s", "failed to serialize database");
@@ -434,6 +609,14 @@ int ncdb_Write(ncdbT db, const char *path) {
         members[member_count++] = (ncdbZipMember){NCDB_MEMBER_FSM, fsm_b.data, fsm_b.size, 0};
     if (tags_b.size > 0)
         members[member_count++] = (ncdbZipMember){NCDB_MEMBER_TAGS, tags_b.data, tags_b.size, 0};
+    if (nuid_b.size > 0)
+        members[member_count++] = (ncdbZipMember){NCDB_MEMBER_UNIQUE_ID, nuid_b.data, nuid_b.size, 0};
+    if (ntas_b.size > 0)
+        members[member_count++] = (ncdbZipMember){NCDB_MEMBER_TESTS_ASSOC, ntas_b.data, ntas_b.size, 0};
+    if (nfrm_b.size > 0)
+        members[member_count++] = (ncdbZipMember){NCDB_MEMBER_FORMAL, nfrm_b.data, nfrm_b.size, 0};
+    if (nmtr_b.size > 0)
+        members[member_count++] = (ncdbZipMember){NCDB_MEMBER_METRICS, nmtr_b.data, nmtr_b.size, 0};
     if (ncdb_zip_write_archive(path, members, member_count, err, sizeof(err)) != 0) {
         ncdb_impl_set_error(db, "%s", err); goto done;
     }
@@ -455,6 +638,10 @@ done:
     ncdb_impl_buf_free(&toggle_b);
     ncdb_impl_buf_free(&fsm_b);
     ncdb_impl_buf_free(&tags_b);
+    ncdb_impl_buf_free(&nuid_b);
+    ncdb_impl_buf_free(&ntas_b);
+    ncdb_impl_buf_free(&nfrm_b);
+    ncdb_impl_buf_free(&nmtr_b);
     return rc;
 }
 

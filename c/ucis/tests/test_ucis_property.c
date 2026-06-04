@@ -81,11 +81,18 @@ static void test_scope_props(void)
     assert(ucis_SetStringProperty(db, cp, -1, UCIS_STR_EXPR_TERMS, "a#b#c") == 0);
     assert(strcmp(ucis_GetStringProperty(db, cp, -1, UCIS_STR_EXPR_TERMS), "a#b#c") == 0);
 
-    /* Long-tail integer property → attr fallback. */
+    /* Long-tail integer property — pre-M2 fell into attrs.bin; post-M2
+     * (Phase 4.2) lands in the typed-property block on the scope. */
     assert(ucis_SetIntProperty(db, cp, -1, UCIS_INT_CVG_STROBE, 1) == 0);
-    ncdbAttrValue av;
-    assert(ncdb_ScopeGetAttr(ucis_internal_get_ncdb(db), (ncdbScopeT)cp, "UCIS_INT_CVG_STROBE", &av) == 0);
-    assert(av.type == NCDB_ATTR_INT64 && av.u.i64 == 1);
+    assert(ucis_GetIntProperty(db, cp, -1, UCIS_INT_CVG_STROBE) == 1);
+    /* Confirm it's *not* sitting in the attribute table — that was the
+     * v3 behavior we replaced. */
+    {
+        ncdbAttrValue av;
+        assert(ncdb_ScopeGetAttr(ucis_internal_get_ncdb(db),
+                                 (ncdbScopeT)cp,
+                                 "UCIS_INT_CVG_STROBE", &av) != 0);
+    }
 
     ucis_Close(db);
 }
@@ -111,12 +118,16 @@ static void test_cover_props(void)
     assert(ucis_GetIntProperty   (db, inst, idx, UCIS_INT_COVER_LIMIT)  == 77);
     assert(strcmp(ucis_GetStringProperty(db, inst, idx, UCIS_STR_COMMENT), "hello") == 0);
 
-    /* Long-tail property on a cover → attr fallback. */
+    /* Long-tail property on a cover — pre-M2 fell into attrs.bin;
+     * post-M2 (Phase 4.2) lands in the typed-property block on the cover. */
     assert(ucis_SetIntProperty(db, inst, idx, UCIS_INT_STMT_INDEX, 5) == 0);
-    ncdbAttrValue av;
-    assert(ncdb_CoverGetAttr(ucis_internal_get_ncdb(db),
-                             ((ncdbScopeT)inst)->covers[idx], "UCIS_INT_STMT_INDEX", &av) == 0);
-    assert(av.u.i64 == 5);
+    assert(ucis_GetIntProperty(db, inst, idx, UCIS_INT_STMT_INDEX) == 5);
+    {
+        ncdbAttrValue av;
+        assert(ncdb_CoverGetAttr(ucis_internal_get_ncdb(db),
+                                 ((ncdbScopeT)inst)->covers[idx],
+                                 "UCIS_INT_STMT_INDEX", &av) != 0);
+    }
 
     /* Out-of-range cover index errors out. */
     assert(ucis_SetIntProperty(db, inst, 99, UCIS_INT_COVER_GOAL, 1) == -1);

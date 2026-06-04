@@ -66,10 +66,17 @@ static void test_dispatch_all_bin_types(void)
     idxs[i++] = create_cover(db, inst, "cover0",   UCIS_COVERBIN,  29);
     idxs[i++] = create_cover(db, inst, "assert0",  UCIS_ASSERTBIN, 31);
 
-    /* Indices must be the insertion order (0..9). */
+    /* Indices must be the *logical* insertion order (0..9). With the
+     * Phase 4.1 / M1 R7 fix, mixed-bin-type covers under one parent are
+     * transparently reparented into UCIS_SCOPE_INTERNAL synthetic
+     * children — but the UCIS API surface (the indices returned and
+     * accepted by Create/Increment/SetCoverFlag) stays a flat sequence. */
     for (int k = 0; k < 10; k++) assert(idxs[k] == k);
 
-    /* Each cover should retain its type byte-for-byte (NCDB enum is UCIS-aligned). */
+    /* Each cover should retain its type byte-for-byte (NCDB enum is
+     * UCIS-aligned). Look up via the logical-view helper so the test
+     * works regardless of which synthetic the writer placed each
+     * cover in. */
     ncdbT core = ucis_internal_get_ncdb(db);
     static const ucisCoverTypeT expected[10] = {
         UCIS_STMTBIN, UCIS_BRANCHBIN, UCIS_EXPRBIN, UCIS_CONDBIN,
@@ -77,9 +84,10 @@ static void test_dispatch_all_bin_types(void)
         UCIS_COVERBIN, UCIS_ASSERTBIN
     };
     for (int k = 0; k < 10; k++) {
-        ncdbScopeT s = (ncdbScopeT)inst;
-        assert((ucisCoverTypeT)s->covers[k]->type == expected[k]);
+        ncdbCoverT c = ncdb_scope_logical_cover_at((ncdbScopeT)inst, (size_t)k);
+        assert(c && (ucisCoverTypeT)c->type == expected[k]);
     }
+    (void)core;
 
     assert(ucis_Close(db) == 0);
 }

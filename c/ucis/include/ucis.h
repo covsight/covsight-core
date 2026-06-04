@@ -311,6 +311,9 @@ int ucis_GetTestData(ucisT db, ucisHistoryNodeT node, ucisTestDataT* data);
 #define UCIS_ENABLED_BLOCK              0x00800000U
 #define UCIS_SCOPE_BLOCK_ISBRANCH       0x01000000U
 #define UCIS_SCOPE_EXPR_ISHIERARCHICAL  0x02000000U
+#define UCIS_SCOPEFLAG_MARK             0x08000000U
+/* High-nibble bits are spec-reserved for tool-internal use. */
+#define UCIS_SCOPE_INTERNAL             0xF0000000U
 
 /* ------------------------------------------------------------------------
  *  Coveritem flags
@@ -461,6 +464,36 @@ void        ucis_ParseDUName(const char*  du_name,
                              const char** secondary_name);
 
 ucisScopeT     ucis_MatchDU(ucisT db, const char* name);
+
+/* Phase 4.5 / M5 — UCIS §8.19 formal-verification data.
+ *
+ * Per the spec, formal-status / radius / witness apply to assert
+ * scopes (and, in the full surface, to specific bins). This first
+ * v4 cut covers per-scope status/radius/witness; per-cover formal
+ * data and formal envs land in a follow-up. */
+typedef enum {
+    UCIS_FORMAL_NONE         = 0,
+    UCIS_FORMAL_FAILURE      = 1,
+    UCIS_FORMAL_PROOF        = 2,
+    UCIS_FORMAL_VACUOUS      = 3,
+    UCIS_FORMAL_INCONCLUSIVE = 4,
+    UCIS_FORMAL_ASSUMPTION   = 5,
+    UCIS_FORMAL_CONFLICT     = 6
+} ucisFormalStatusT;
+
+int                ucis_SetFormalStatus (ucisT db, ucisScopeT scope, ucisFormalStatusT s);
+ucisFormalStatusT  ucis_GetFormalStatus (ucisT db, ucisScopeT scope);
+int                ucis_SetFormalRadius (ucisT db, ucisScopeT scope, int64_t radius);
+int64_t            ucis_GetFormalRadius (ucisT db, ucisScopeT scope);
+int                ucis_SetFormalWitness(ucisT db, ucisScopeT scope, const char *witness);
+const char        *ucis_GetFormalWitness(ucisT db, ucisScopeT scope);
+
+/* Phase 4.3 / M3 — UCIS §5.5: locate a scope by its unique-ID string.
+ * Looks up the database's NUID index (built on Write) in O(log n);
+ * falls back to an O(n) DFS recompute-and-strcmp pass if the index
+ * isn't loaded (e.g. an in-memory DB that has never been written).
+ * `scope` is currently ignored — only absolute UIDs are supported. */
+ucisScopeT ucis_MatchScopeByUniqueID(ucisT db, ucisScopeT scope, const char* uniqueID);
 ucisScopeTypeT ucis_GetScopeType(ucisT db, ucisScopeT scope);
 ucisObjTypeT   ucis_GetObjType(ucisT db, ucisObjT obj);
 

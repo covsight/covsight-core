@@ -29,6 +29,11 @@ set(NCDB_SOURCES
     src/ncdb_history.c
     src/ncdb_sources.c
     src/ncdb_attrs.c
+    src/ncdb_props.c
+    src/ncdb_unique_id.c
+    src/ncdb_tests_assoc.c
+    src/ncdb_formal.c
+    src/ncdb_metric.c
     src/ncdb_toggle.c
     src/ncdb_cross.c
     src/ncdb_fsm.c

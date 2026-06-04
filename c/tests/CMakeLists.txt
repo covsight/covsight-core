@@ -23,6 +23,11 @@ add_ncdb_test(test_attrs)
 add_ncdb_test(test_toggle)
 add_ncdb_test(test_fsm)
 add_ncdb_test(test_manifest_vendor)
+add_ncdb_test(test_manifest_v4)
+add_ncdb_test(test_tests_assoc)
+add_ncdb_test(test_metrics)
+add_ncdb_test(test_scope_trailer)
+add_ncdb_test(test_v4_benchmark)
 add_ncdb_test(test_history_tree)
 add_ncdb_test(test_tags)
 add_ncdb_test(test_du_link)
@@ -34,6 +39,13 @@ add_executable(test_migration test_migration.c)
 target_link_libraries(test_migration PRIVATE ncdb_test_common)
 add_test(NAME test_migration COMMAND test_migration)
 set_tests_properties(test_migration PROPERTIES
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+    ENVIRONMENT "NCDB_GOLDEN_DIR=${PROJECT_SOURCE_DIR}/../tests/compat/golden")
+
+add_executable(test_v3_to_v4_migration test_v3_to_v4_migration.c)
+target_link_libraries(test_v3_to_v4_migration PRIVATE ncdb_test_common)
+add_test(NAME test_v3_to_v4_migration COMMAND test_v3_to_v4_migration)
+set_tests_properties(test_v3_to_v4_migration PROPERTIES
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
     ENVIRONMENT "NCDB_GOLDEN_DIR=${PROJECT_SOURCE_DIR}/../tests/compat/golden")
 

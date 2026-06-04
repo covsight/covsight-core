@@ -39,3 +39,23 @@ add_executable(test_ucis_increment test_ucis_increment.c)
 target_link_libraries(test_ucis_increment PRIVATE ncdb_ucis)
 target_include_directories(test_ucis_increment PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../src)
 add_test(NAME test_ucis_increment COMMAND test_ucis_increment)
+
+add_executable(test_ucis_r7_assertion test_ucis_r7_assertion.c)
+target_link_libraries(test_ucis_r7_assertion PRIVATE ncdb_ucis)
+target_include_directories(test_ucis_r7_assertion PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../src)
+add_test(NAME test_ucis_r7_assertion COMMAND test_ucis_r7_assertion)
+
+add_executable(test_ucis_props test_ucis_props.c)
+target_link_libraries(test_ucis_props PRIVATE ncdb_ucis m)
+target_include_directories(test_ucis_props PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../src)
+add_test(NAME test_ucis_props COMMAND test_ucis_props)
+
+add_executable(test_ucis_unique_id test_ucis_unique_id.c)
+target_link_libraries(test_ucis_unique_id PRIVATE ncdb_ucis)
+target_include_directories(test_ucis_unique_id PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../src)
+add_test(NAME test_ucis_unique_id COMMAND test_ucis_unique_id)
+
+add_executable(test_ucis_formal test_ucis_formal.c)
+target_link_libraries(test_ucis_formal PRIVATE ncdb_ucis)
+target_include_directories(test_ucis_formal PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../src)
+add_test(NAME test_ucis_formal COMMAND test_ucis_formal)

@@ -7,7 +7,8 @@ set(NCDB_UCIS_SOURCES
     src/ucis_history.c
     src/ucis_cover.c
     src/ucis_property.c
-    src/ucis_covergroup.c)
+    src/ucis_covergroup.c
+    src/ucis_formal.c)
 
 add_library(ncdb_ucis STATIC ${NCDB_UCIS_SOURCES})
 target_include_directories(ncdb_ucis

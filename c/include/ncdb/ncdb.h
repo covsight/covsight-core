@@ -38,6 +38,13 @@ uint64_t     ncdb_GetCoverCount(ncdbT db, ncdbCoverT cover);
 
 int  ncdb_HistoryIterate(ncdbT db, uint32_t kind_mask,
                          int (*cb)(ncdbT, ncdbHistoryNodeT, void *), void *ud);
+
+/* Phase 4.4 / M4 — record that `h` contributed to `cover`. MERGE history
+ * nodes are rejected (their associations are derivable from children).
+ * Idempotent: adding the same (cover, h) pair twice is a no-op. */
+int    ncdb_AssocCoverHistory(ncdbT db, ncdbCoverT cover, ncdbHistoryNodeT h);
+size_t ncdb_CoverHistoryCount(ncdbT db, ncdbCoverT cover);
+ncdbHistoryNodeT ncdb_CoverHistoryAt(ncdbT db, ncdbCoverT cover, size_t idx);
 uint32_t     ncdb_GetHistoryKind(ncdbT db, ncdbHistoryNodeT node);
 const char  *ncdb_GetHistoryLogicalName(ncdbT db, ncdbHistoryNodeT node);
 const char  *ncdb_GetHistoryPhysicalName(ncdbT db, ncdbHistoryNodeT node);
