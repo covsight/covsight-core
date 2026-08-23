@@ -97,8 +97,20 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - name: Fetch C dependencies
-        run: pip install ivpm && ivpm update
+      - name: Fetch dependencies
+      # ivpm creates a venv at packages/python and installs the pypi deps
+      # declared in ivpm.yaml into it. The project goes in editable on top --
+      # ivpm does not install the containing package itself, and the repo-root
+      # conftest.py sets pytest_plugins = ("covsight.core.conformance.marker",),
+      # which pytest imports before collection, so any pytest run from this root
+      # needs covsight importable or it dies with "Error importing plugin".
+      #
+      # Everything below runs out of that interpreter rather than the system
+      # one, so CI and a developer's `ivpm update` shell are the same
+      # environment and the dependency list has exactly one home: ivpm.yaml.
+        run: |
+          pip install ivpm && ivpm update
+          packages/python/bin/pip install -e .
       - name: Build
         run: cmake -S c -B c/build && cmake --build c/build
       - name: Test
@@ -121,22 +133,32 @@ jobs:
           ctest --test-dir c/build-asan --output-on-failure
       - name: ucis_writer examples validate against the UCIS XSD
         run: |
-          # `.` is required, not incidental: the repo-root conftest.py sets
-          # pytest_plugins = ("covsight.core.conformance.marker",), which pytest
-          # imports before collection, so ANY pytest run from this root needs
-          # covsight importable or it dies with "Error importing plugin". No
-          # extras -- the plugin only needs pyyaml, which is a base dependency.
-          pip install xmlschema pytest .
           UCIS_WRITER_EXAMPLE_OUT=c/build/ucis-writer/examples/out \
-            python3 -m pytest tests/ucis_writer -q
+            packages/python/bin/python -m pytest tests/ucis_writer -q
 
   cpp:
     name: C++ tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      # C-1. cpp/ucis-xml has no dependencies at all, so unlike the C job there
-      # is nothing to fetch first.
+      # C-1. cpp/ucis-xml has no C++ dependencies -- the build below needs
+      # nothing fetched. This step is here for the PYTHON side: the XSD
+      # validation and the Hawkmoth reference check further down both run
+      # pytest, and both run it out of the ivpm venv.
+      - name: Fetch dependencies
+      # ivpm creates a venv at packages/python and installs the pypi deps
+      # declared in ivpm.yaml into it. The project goes in editable on top --
+      # ivpm does not install the containing package itself, and the repo-root
+      # conftest.py sets pytest_plugins = ("covsight.core.conformance.marker",),
+      # which pytest imports before collection, so any pytest run from this root
+      # needs covsight importable or it dies with "Error importing plugin".
+      #
+      # Everything below runs out of that interpreter rather than the system
+      # one, so CI and a developer's `ivpm update` shell are the same
+      # environment and the dependency list has exactly one home: ivpm.yaml.
+        run: |
+          pip install ivpm && ivpm update
+          packages/python/bin/pip install -e .
       - name: Build
         run: cmake -S cpp/ucis-xml -B cpp/build && cmake --build cpp/build -j
       - name: Test
@@ -173,14 +195,8 @@ jobs:
       # every complex type ucis.xsd declares.
       - name: ucis_xml examples validate against the UCIS XSD
         run: |
-          # `.` is required, not incidental: the repo-root conftest.py sets
-          # pytest_plugins = ("covsight.core.conformance.marker",), which pytest
-          # imports before collection, so ANY pytest run from this root needs
-          # covsight importable or it dies with "Error importing plugin". No
-          # extras -- the plugin only needs pyyaml, which is a base dependency.
-          pip install xmlschema pytest .
           UCIS_XML_EXAMPLE_OUT=cpp/build/examples/out \
-            python3 -m pytest tests/ucis_xml -q \
+            packages/python/bin/python -m pytest tests/ucis_xml -q \
               --ignore=tests/ucis_xml/test_scale.py \
               --ignore=tests/ucis_xml/test_docs.py
       # The published C++ reference is extracted from the header by Hawkmoth,
@@ -190,10 +206,9 @@ jobs:
       # than only in the docs job, since the thing that breaks it is a source
       # edit.
       - name: C++ API reference still extracts
-        run: |
-          # `.` for the same reason as the step above.
-          pip install sphinx hawkmoth libclang .
-          python3 -m pytest tests/ucis_xml/test_docs.py -q
+        # sphinx, hawkmoth and libclang are ivpm.yaml deps, so they are
+        # already in the venv from the fetch step.
+        run: packages/python/bin/python -m pytest tests/ucis_xml/test_docs.py -q
       # L-3. A NOTICE file here would silently reintroduce the Apache-2.0 §4(d)
       # obligation that the Apache-2.0 OR MIT dual licence exists to avoid, so
       # adding one has to fail rather than pass unnoticed.

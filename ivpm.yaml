@@ -22,6 +22,14 @@ package:
     - name: libclang
       src: pypi
       version: ">=18.1.1"
+    # Test-side dependencies live here rather than in ad-hoc `pip install`
+    # lines in CI, so there is one declared list. The C and C++ jobs run their
+    # XSD-validation suites out of the ivpm venv (packages/python), which is
+    # the same interpreter a developer gets from `ivpm update` locally.
+    - name: pytest
+      src: pypi
+    - name: xmlschema
+      src: pypi
     - name: node
       src: package.json
       path: ts/package.json
