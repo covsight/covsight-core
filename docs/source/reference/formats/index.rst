@@ -5,4 +5,5 @@ File Formats
    :maxdepth: 2
 
    ncdb
+   parquet-mapping
    testplan

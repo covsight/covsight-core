@@ -1,0 +1,47 @@
+# UCIS conformance registry -- section 2: Error handling
+#
+# GENERATED SKELETON, HAND-MAINTAINED THEREAFTER.
+# Records intent only: what the backend is expected to do with each feature.
+# Status ("is it tested?", "is it documented?") is computed by
+# tools/gen_conformance_matrix.py and never written here.
+#
+# See docs/conformance/README.md.
+
+section:
+  number: 2
+  title: "Error handling"
+  spec_ref: "§ 8.2"
+
+features:
+  - id: E2.1
+    title: "`ucis_RegisterErrorHandler(handler, userdata)`"
+    spec_ref: "§ 8.2.1"
+    kind: feature
+    backends:
+      parquet:
+        scope: out_of_scope
+        reason: >
+          API-level error reporting, registered per process. No persistent
+          representation in the dataset.
+
+  - id: E2.2
+    title: "`ucisErrorT { msgno, severity, msgstr }`"
+    spec_ref: "§ 8.2"
+    kind: feature
+    backends:
+      parquet:
+        scope: out_of_scope
+        reason: >
+          API-level error reporting, registered per process. No persistent
+          representation in the dataset.
+
+  - id: E2.3
+    title: "Severity enum: `INFO`, `WARNING`, `ERROR`"
+    spec_ref: "§ 8.2"
+    kind: feature
+    backends:
+      parquet:
+        scope: out_of_scope
+        reason: >
+          API-level error reporting, registered per process. No persistent
+          representation in the dataset.

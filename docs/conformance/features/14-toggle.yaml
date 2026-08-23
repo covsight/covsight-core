@@ -1,0 +1,80 @@
+# UCIS conformance registry -- section 14: Toggle coverage
+#
+# GENERATED SKELETON, HAND-MAINTAINED THEREAFTER.
+# Records intent only: what the backend is expected to do with each feature.
+# Status ("is it tested?", "is it documented?") is computed by
+# tools/gen_conformance_matrix.py and never written here.
+#
+# See docs/conformance/README.md.
+
+section:
+  number: 14
+  title: "Toggle coverage"
+  spec_ref: "§ 6.5.5, § 8.15"
+
+features:
+  - id: TG.1
+    title: "`UCIS_TOGGLE` scope with `UCIS_TOGGLEBIN` children"
+    spec_ref: "§ 6.5.5"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+
+  - id: TG.2
+    title: "`ucisToggleMetricT`: `NOBINS`, `ENUM`, `TRANSITION`, `2STOGGLE`, `ZTOGGLE`, `XTOGGLE`"
+    spec_ref: "§ 6.5.5"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+
+  - id: TG.3
+    title: "`ucisToggleTypeT`: `NET`, `REG`"
+    spec_ref: "§ 6.5.5"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+
+  - id: TG.4
+    title: "`ucisToggleDirT`: `INTERNAL`, `IN`, `OUT`, `INOUT`"
+    spec_ref: "§ 6.5.5"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+
+  - id: TG.5
+    title: "`UCIS_STR_TOGGLE_CANON_NAME` for net-aliasing (§ 4.10)"
+    spec_ref: "§ 4.10"
+    kind: feature
+    backends:
+      parquet:
+        scope: deferred
+        reason: >
+          Blocked on the § 4.10 net-aliasing scope decision: whether the mapping
+          preserves the alias relation or flattens aliased nets into shared
+          counts. Freezing current behaviour by testing it would pre-empt that
+          decision.
+        adr: docs/adr/0003-parquet-backend.md
+
+  - id: TG.6
+    title: "Toggle properties: `UCIS_INT_TOGGLE_TYPE/DIR/METRIC/COVERED`"
+    spec_ref: "§ 6.5.5"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+
+  - id: TG.7
+    title: "Toggle XML schema: `TOGGLE_OBJECT`, `TOGGLE_BIT`, `TOGGLE`"
+    spec_ref: "§ 9.7"
+    kind: feature
+    backends:
+      parquet:
+        scope: out_of_scope
+        reason: >
+          XML interchange is a separate backend (covsight.core.xml) with its own
+          format plugin. Conversion runs through the UCIS object API, so the
+          Parquet mapping neither reads nor writes XML.

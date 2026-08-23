@@ -1,0 +1,54 @@
+# UCIS conformance registry -- section 10: Source files
+#
+# GENERATED SKELETON, HAND-MAINTAINED THEREAFTER.
+# Records intent only: what the backend is expected to do with each feature.
+# Status ("is it tested?", "is it documented?") is computed by
+# tools/gen_conformance_matrix.py and never written here.
+#
+# See docs/conformance/README.md.
+
+section:
+  number: 10
+  title: "Source files"
+  spec_ref: "§ 8.12"
+
+features:
+  - id: F10.1
+    title: "`ucis_CreateFileHandle(db, filename, fileworkdir)`"
+    spec_ref: "§ 8.12.2"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      source_files is per-DU because UCIS file IDs are DU-local (ADR 0001).
+
+  - id: F10.2
+    title: "`ucis_GetFileName(db, fh)`"
+    spec_ref: "§ 8.12.3"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      source_files is per-DU because UCIS file IDs are DU-local (ADR 0001).
+
+  - id: F10.3
+    title: "`ucisSourceInfoT { filehandle, line, token }` — per-scope/per-cover loc"
+    spec_ref: "§ 3.4.7"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      source_files is per-DU because UCIS file IDs are DU-local (ADR 0001).
+
+  - id: F10.4
+    title: "Per-DU file table (file IDs are local to a DU)"
+    spec_ref: "§ 6.3.3"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      source_files is per-DU because UCIS file IDs are DU-local (ADR 0001).

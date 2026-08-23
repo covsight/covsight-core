@@ -1,0 +1,82 @@
+# UCIS conformance registry -- section 15: FSM coverage
+#
+# GENERATED SKELETON, HAND-MAINTAINED THEREAFTER.
+# Records intent only: what the backend is expected to do with each feature.
+# Status ("is it tested?", "is it documented?") is computed by
+# tools/gen_conformance_matrix.py and never written here.
+#
+# See docs/conformance/README.md.
+
+section:
+  number: 15
+  title: "FSM coverage"
+  spec_ref: "§ 6.5.6"
+
+features:
+  - id: FS.1
+    title: "`UCIS_FSM` scope with `UCIS_STR_FSM_STATEVAR` (state-var name)"
+    spec_ref: "§ 6.5.6"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+
+  - id: FS.2
+    title: "`UCIS_FSM_STATES` child scope with `UCIS_STATEBIN` per state"
+    spec_ref: "§ 6.5.6"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+
+  - id: FS.3
+    title: "`UCIS_FSM_TRANS` child scope with `UCIS_TRANSBIN` per arc"
+    spec_ref: "§ 6.5.6"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+
+  - id: FS.4
+    title: "`UCIS_INT_FSM_STATEVAL` integer property on state bins"
+    spec_ref: "§ 6.5.6"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+
+  - id: FS.5
+    title: "`ucis_CreateNextTransition` constructor for arcs"
+    spec_ref: "§ 8.5.11"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+
+  - id: FS.6
+    title: "`ucis_GetFSMTransitionStates(db, trans, &src, &dst)`"
+    spec_ref: "§ 8.5.12"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+
+  - id: FS.7
+    title: "Coveritem flags: `UCIS_IS_FSM_RESET`, `UCIS_IS_FSM_TRAN`"
+    spec_ref: "§ 6"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+
+  - id: FS.8
+    title: "XML schema: `FSM`, `FSM_STATE`, `FSM_TRANSITION`"
+    spec_ref: "§ 9.11"
+    kind: feature
+    backends:
+      parquet:
+        scope: out_of_scope
+        reason: >
+          XML interchange is a separate backend (covsight.core.xml) with its own
+          format plugin. Conversion runs through the UCIS object API, so the
+          Parquet mapping neither reads nor writes XML.

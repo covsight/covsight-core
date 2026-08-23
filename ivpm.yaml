@@ -11,6 +11,17 @@ package:
     - name: sphinx-js
       src: pypi
       version: ">=5.0.3"
+    # Hawkmoth extracts the C++ reference straight from the writer's headers
+    # into Sphinx's cpp domain -- no Doxygen and no XML intermediate. It parses
+    # with libclang, and the libclang wheel bundles its own shared library, so
+    # no system package is needed; hawkmoth_compiler in docs/source/conf.py
+    # asks the local g++ where the standard headers live.
+    - name: hawkmoth
+      src: pypi
+      version: ">=0.22.0"
+    - name: libclang
+      src: pypi
+      version: ">=18.1.1"
     - name: node
       src: package.json
       path: ts/package.json

@@ -1,0 +1,107 @@
+# UCIS conformance registry -- section 7: Iteration / traversal
+#
+# GENERATED SKELETON, HAND-MAINTAINED THEREAFTER.
+# Records intent only: what the backend is expected to do with each feature.
+# Status ("is it tested?", "is it documented?") is computed by
+# tools/gen_conformance_matrix.py and never written here.
+#
+# See docs/conformance/README.md.
+
+section:
+  number: 7
+  title: "Iteration / traversal"
+  spec_ref: "§ 8.6–8.10"
+
+features:
+  - id: IT.1
+    title: "`ucis_ScopeIterate(db, parent, mask)` → iterator"
+    spec_ref: "§ 8.6.1"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      scopes.dfs_ordinal exists precisely to reproduce this order without
+      re-deriving it.
+
+  - id: IT.2
+    title: "`ucis_ScopeScan(db, iter)` → next scope"
+    spec_ref: "§ 8.6.2"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      scopes.dfs_ordinal exists precisely to reproduce this order without
+      re-deriving it.
+
+  - id: IT.3
+    title: "`ucis_FreeIterator(db, iter)`"
+    spec_ref: "§ 8.6.3"
+    kind: feature
+    backends:
+      parquet:
+        scope: out_of_scope
+        reason: >
+          Process-local handle lifetime. Nothing about it is persisted, so there
+          is nothing for the mapping to represent.
+
+  - id: IT.4
+    title: "`ucis_CoverIterate(db, scope, covermask)`"
+    spec_ref: "§ 8.7.1"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      (scope_id, local_index) reproduces CoverIterate order.
+
+  - id: IT.5
+    title: "`ucis_CoverScan(db, iter, &index)`"
+    spec_ref: "§ 8.7.2"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      (scope_id, local_index) reproduces CoverIterate order.
+
+  - id: IT.6
+    title: "`ucis_HistoryIterate(db, parent, kind)`"
+    spec_ref: "§ 8.8.1"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+
+  - id: IT.7
+    title: "`ucis_HistoryScan(db, iter)`"
+    spec_ref: "§ 8.8.2"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+
+  - id: IT.8
+    title: "`ucis_TaggedObjIterate(db, tag)` / `TaggedObjScan`"
+    spec_ref: "§ 8.9"
+    kind: feature
+    backends:
+      parquet:
+        scope: extended
+        reason: >
+          Tag traversal; extended for the same reason as the tags it traverses.
+    notes: >
+      Depends on tags (§ 13) being represented at all.
+
+  - id: IT.9
+    title: "`ucis_ObjectTagsIterate(db, obj)` / `ObjectTagsScan`"
+    spec_ref: "§ 8.10"
+    kind: feature
+    backends:
+      parquet:
+        scope: extended
+        reason: >
+          Tag traversal; extended for the same reason as the tags it traverses.
+    notes: >
+      Depends on tags (§ 13) being represented at all.

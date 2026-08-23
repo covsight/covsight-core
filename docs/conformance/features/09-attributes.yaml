@@ -1,0 +1,69 @@
+# UCIS conformance registry -- section 9: User-defined attributes
+#
+# GENERATED SKELETON, HAND-MAINTAINED THEREAFTER.
+# Records intent only: what the backend is expected to do with each feature.
+# Status ("is it tested?", "is it documented?") is computed by
+# tools/gen_conformance_matrix.py and never written here.
+#
+# See docs/conformance/README.md.
+
+section:
+  number: 9
+  title: "User-defined attributes"
+  spec_ref: "§ 3.4.2, § 8.4"
+
+features:
+  - id: A9.1
+    title: "`ucis_AttrAdd(db, obj, coverindex, key, value)`"
+    spec_ref: "§ 8.4.1"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      The properties table is EAV and typed; object_kind discriminates the
+      owning object. See X.11.
+
+  - id: A9.2
+    title: "`ucis_AttrMatch(db, obj, coverindex, key)` → iterator-style match"
+    spec_ref: "§ 8.4.2"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      The properties table is EAV and typed; object_kind discriminates the
+      owning object. See X.11.
+
+  - id: A9.3
+    title: "`ucis_AttrNext(db, obj, coverindex, prev_key, &key, &value)`"
+    spec_ref: "§ 8.4.3"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      The properties table is EAV and typed; object_kind discriminates the
+      owning object. See X.11.
+
+  - id: A9.4
+    title: "`ucis_AttrRemove(db, obj, coverindex, key)`"
+    spec_ref: "§ 8.4.4"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      The properties table is EAV and typed; object_kind discriminates the
+      owning object. See X.11.
+
+  - id: A9.5
+    title: "Attr value types: `INT`, `INT64`, `FLOAT`, `DOUBLE`, `STRING`, `MEMBLK`"
+    spec_ref: "§ 8.4"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      The properties table is EAV and typed; object_kind discriminates the
+      owning object. See X.11.

@@ -1,0 +1,202 @@
+# UCIS conformance registry -- section 90: feature combinations
+#
+# HAND-AUTHORED. These IDs do not come from ucis-feature-catalog.md; they come
+# from the combination table in docs/ucis-mapping-conformance-plan.md.
+#
+# A combination exists because the features it composes are each individually
+# correct and still produce a wrong result together -- almost always because the
+# merge operator differs per feature (SUM vs MAX vs UNION vs precedence) while
+# the rows being merged join on the same key. Testing the parts does not test
+# these; that is the entire justification for the kind.
+#
+# Note on IDs: `X.n` here is a different prefix from `X25.n` (XML interchange,
+# section 25). They do not collide -- the prefix is the letters before the dot --
+# but do not shorten `X25.1` to `X.1` in prose.
+
+section:
+  number: 90
+  title: "Feature combinations"
+  notes: >
+    Cross-feature interactions from the conformance plan's combination table.
+    Sourced from docs/ucis-mapping-conformance-plan.md, not from the catalog.
+
+features:
+  - id: X.1
+    title: "cross × per-bin exclusion × merge"
+    kind: combination
+    composes: [S4.4, C6.6, SF.10]
+    applies_to: [write, read, merge]
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Exclusion flags merge as UNION while counts merge as SUM -- two different
+      operators on rows that join on the same key. Getting one right says
+      nothing about the other.
+
+  - id: X.2
+    title: "toggle scope × vector grouping × multi-run"
+    kind: combination
+    composes: [TG.1, TG.6, H11.1]
+    applies_to: [write, read, merge]
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      NCDB has a shape-aware vector-toggle path that Parquet does not express.
+      The physical representations may differ; the logical UCIS view must not.
+
+  - id: X.3
+    title: "FSM states + transitions × merge"
+    kind: combination
+    composes: [FS.2, FS.3, S4.6]
+    applies_to: [write, read, merge]
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Transitions are scopes built by a different constructor (S4.6) but merge
+      like coveritems. The asymmetry is where implementations diverge.
+
+  - id: X.4
+    title: "assertion bins × formal results × merge"
+    kind: combination
+    composes: [AS.3, FM.1, FM.2]
+    applies_to: [write, read, merge]
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      SUM is wrong here. Formal status merges by precedence, radius by max, and
+      the witness must follow the status it belongs to rather than being merged
+      independently.
+
+  - id: X.5
+    title: "PEAKACTIVEBIN × merge at N=64"
+    kind: combination
+    composes: [BT.19, H11.1]
+    applies_to: [merge]
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      The merge operator is MAX. A plausible-looking SUM is the documented
+      failure -- NCDB shipped it. N=64 because a two-run test cannot distinguish
+      MAX from "took the second one".
+
+  - id: X.6
+    title: "promoted property unsupported by source × round-trip"
+    kind: combination
+    composes: [DB.5, DB.6]
+    applies_to: [write, read]
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      The promoted_props bitmask must preserve the difference between "the value
+      is 1" and "this backend raises UnimplError". Collapsing the two is silent
+      data invention.
+
+  - id: X.7
+    title: "assoc tier ALL/NEVER × merge with a SPARSE-tier run"
+    kind: combination
+    composes: [HL.6, HL.7]
+    applies_to: [merge]
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Tiers are a property row, not a schema fork; merging them is a set UNION
+      over a compressed representation.
+
+  - id: X.8
+    title: "history tree depth > 1 × append × merge node"
+    kind: combination
+    composes: [H11.1, H11.5]
+    applies_to: [write, append, merge]
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      A merge appends a node. Appending a run must not rewrite the
+      run-independent definition tables -- if it does, append is secretly a
+      rewrite and the cost model in the benchmark plan is wrong.
+
+  - id: X.9
+    title: "UCIS+ extension namespace × unknown-namespace passthrough"
+    kind: combination
+    composes: [A9.1, DB.2]
+    applies_to: [read, write]
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      A reader that does not understand `covsight:` must preserve those rows
+      rather than drop them. This is the forward-compatibility rule that lets
+      the format evolve without forking.
+
+  - id: X.10
+    title: "same unique_id with a drifted definition (goal changed) must fail the merge"
+    kind: negative
+    applies_to: [merge]
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Silently picking one definition produces a database that is wrong in a way
+      no downstream check can detect. This must be a merge error.
+
+  - id: X.11
+    title: "user-defined attributes on every object kind × EAV encoding"
+    kind: combination
+    composes: [A9.1, A9.5, T13.1]
+    applies_to: [write, read]
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      object_kind discriminates the EAV rows; attributes on history nodes go to
+      history_props, not properties. One table per object kind is the mistake
+      this guards against.
+
+  - id: X.12
+    title: "net aliasing × toggle counts"
+    kind: combination
+    composes: [NA.1, TG.5]
+    applies_to: [write, read, merge]
+    backends:
+      parquet:
+        scope: deferred
+        reason: >
+          Blocked on the § 4.10 net-aliasing scope decision: whether the mapping
+          preserves the alias relation or flattens aliased nets into shared
+          counts. Testing the combination before that is settled would freeze
+          whichever behaviour the implementation happens to have.
+        adr: docs/adr/0003-parquet-backend.md
+    notes: >
+      Depends on NA.1/NA.2, which carry the same deferral. Revisit together.
+
+  - id: X.13
+    title: "Iceberg round trip × narrow integer columns"
+    kind: combination
+    composes: [C6.6, DB.3]
+    applies_to: [write, read]
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Iceberg widens INT8 to INT32 and the reader conforms. The assertion must
+      be against the declared logical schema, not the storage schema, or the
+      test passes on raw Parquet and fails on Iceberg for no real reason.
+
+  - id: X.14
+    title: "multi-run dataset × single-run selection × partition pruning"
+    kind: combination
+    composes: [H11.1, IT.6]
+    applies_to: [read, query]
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      The merged view and the single-run view must each be a coherent UCIS
+      database on its own.

@@ -1,0 +1,79 @@
+# UCIS conformance registry -- section 24: Metrics
+#
+# GENERATED SKELETON, HAND-MAINTAINED THEREAFTER.
+# Records intent only: what the backend is expected to do with each feature.
+# Status ("is it tested?", "is it documented?") is computed by
+# tools/gen_conformance_matrix.py and never written here.
+#
+# See docs/conformance/README.md.
+
+section:
+  number: 24
+  title: "Metrics"
+  spec_ref: "§ 4.9"
+
+features:
+  - id: MT.1
+    title: "Metric naming model (URL-style)"
+    spec_ref: "§ 4.9.2"
+    kind: feature
+    backends:
+      parquet:
+        scope: deferred
+        reason: >
+          The UCIS metric model (naming, criteria, built-in definitions) is a
+          derived view over stored coverage rather than stored data. Whether the
+          mapping should persist metric definitions or compute them is
+          undecided.
+        adr: docs/adr/0003-parquet-backend.md
+
+  - id: MT.2
+    title: "Metric criteria (covered / excluded / pragma)"
+    spec_ref: "§ 4.9.3"
+    kind: feature
+    backends:
+      parquet:
+        scope: deferred
+        reason: >
+          The UCIS metric model (naming, criteria, built-in definitions) is a
+          derived view over stored coverage rather than stored data. Whether the
+          mapping should persist metric definitions or compute them is
+          undecided.
+        adr: docs/adr/0003-parquet-backend.md
+
+  - id: MT.3
+    title: "Metric excluded-value coveritem flags"
+    spec_ref: "§ 4.9.4"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Excluded-value markers are coveritem flags, which the mapping already
+      carries and merges by UNION.
+
+  - id: MT.4
+    title: "Built-in metric definitions (per coverage type)"
+    spec_ref: "§ 4.9.5"
+    kind: feature
+    backends:
+      parquet:
+        scope: deferred
+        reason: >
+          The UCIS metric model (naming, criteria, built-in definitions) is a
+          derived view over stored coverage rather than stored data. Whether the
+          mapping should persist metric definitions or compute them is
+          undecided.
+        adr: docs/adr/0003-parquet-backend.md
+
+  - id: MT.5
+    title: "XML `METRIC_MODE` and metric attributes"
+    spec_ref: "§ 9.3.10–11"
+    kind: feature
+    backends:
+      parquet:
+        scope: out_of_scope
+        reason: >
+          XML interchange is a separate backend (covsight.core.xml) with its own
+          format plugin. Conversion runs through the UCIS object API, so the
+          Parquet mapping neither reads nor writes XML.

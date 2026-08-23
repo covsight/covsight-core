@@ -5,6 +5,7 @@ on:
     branches: [main, master]
   pull_request:
     branches: [main, master]
+  # The engine job below takes a service dependency, so it is opt-in.
   workflow_dispatch:
 
 permissions:
@@ -21,10 +22,56 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: "3.11"
+      # Tiers 1-2: raw Parquet and ephemeral Iceberg (PyIceberg on SQLite).
+      # Both are pip-installable and need no services, so they belong in the
+      # default job. DuckDB is here for the same reason -- it is a library, not
+      # a service; only the REST catalog needs the opt-in job below. It also has
+      # to be here for the conformance matrix to be reproducible: tests/parquet/
+      # test_duckdb.py skips at module scope, so without duckdb those files
+      # yield no collected items and the regenerated matrix would differ from
+      # the committed one.
       - name: Install
-        run: pip install -e ".[dev,validate]"
+        run: pip install -e ".[dev,validate,parquet,iceberg,duckdb]"
       - name: Test
-        run: pytest
+        run: pytest --conformance-json=tests/conformance/coverage.json
+      # The drift gate. Same mechanism as tools/amalgamate.py --check in the C
+      # job: a PR that changes the mapping, the registry, or the tagged tests
+      # without committing a regenerated matrix fails here. No reviewer
+      # vigilance required.
+      - name: Conformance matrix is current
+        run: |
+          python3 tools/gen_conformance_matrix.py \
+            --evidence tests/conformance/coverage.json --check
+      - name: Feature catalog and registry agree
+        run: python3 tools/sync_catalog.py --check
+
+  parquet-engines:
+    name: Parquet engine adapters (opt-in)
+    runs-on: ubuntu-latest
+    # Tier 3 plus the benchmark query adapters: needs a REST catalog container
+    # and the DuckDB extra, so it is not on the PR path.
+    if: github.event_name == 'workflow_dispatch'
+    services:
+      iceberg-rest:
+        image: apache/iceberg-rest-fixture
+        ports:
+          - 8181:8181
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+      - name: Install
+        run: pip install -e ".[dev,validate,parquet,iceberg,duckdb]"
+      # Deliberately no --conformance-json here: this job runs a subset, so its
+      # evidence would be partial. The generator would refuse it anyway
+      # (collected_full is false), but not asking is clearer than being refused.
+      - name: Test
+        env:
+          COVSIGHT_ICEBERG_REST: "1"
+        run: pytest tests/parquet
 
   typescript:
     name: TypeScript tests
@@ -56,6 +103,96 @@ jobs:
         run: cmake -S c -B c/build && cmake --build c/build
       - name: Test
         run: ctest --test-dir c/build --output-on-failure
+      # The single header is the artifact consumers vendor. If it drifts from
+      # the sources this suite tests, everything above is testing something we
+      # do not ship (plan D1). The build regenerates it, so a diff here means
+      # the regenerated header was never committed.
+      - name: ucis_writer single header is current
+        run: python3 tools/amalgamate.py --check c/ucis-writer/include/ucis_writer.h
+      # The writer's whole suite runs in well under a second, so there is no
+      # reason to make this an opt-in job. It has already caught a
+      # use-after-free that the ordinary build ran past cleanly.
+      - name: ucis_writer under AddressSanitizer and UBSan
+        run: |
+          cmake -S c/ucis-writer -B c/build-asan \
+            -DCMAKE_C_FLAGS="-fsanitize=address,undefined -fno-sanitize-recover=all -g" \
+            -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined"
+          cmake --build c/build-asan -j
+          ctest --test-dir c/build-asan --output-on-failure
+      - name: ucis_writer examples validate against the UCIS XSD
+        run: |
+          pip install xmlschema
+          UCIS_WRITER_EXAMPLE_OUT=c/build/ucis-writer/examples/out \
+            python3 -m pytest tests/ucis_writer -q
+
+  cpp:
+    name: C++ tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      # C-1. cpp/ucis-xml has no dependencies at all, so unlike the C job there
+      # is nothing to fetch first.
+      - name: Build
+        run: cmake -S cpp/ucis-xml -B cpp/build && cmake --build cpp/build -j
+      - name: Test
+        run: ctest --test-dir cpp/build --output-on-failure
+      # C-3. The single header is the artifact consumers vendor. If it drifts
+      # from the sources this suite tests, everything above is testing something
+      # we do not ship (plan D-9). The build regenerates it, so a diff here
+      # means the regenerated header was never committed.
+      - name: ucis_xml single header is current
+        run: |
+          python3 tools/amalgamate.py --manifest cpp/ucis-xml/amalgam.toml \
+            --check cpp/ucis-xml/include/ucis_xml.hpp
+      # C-5. Both descriptor forms have to keep compiling: C++17 is the floor
+      # (D-6, verified against Verilator's -std=gnu++17), and a consumer on
+      # C++20 may write designated initializers.
+      - name: Build at C++17 and C++20
+        run: |
+          for std in 17 20; do
+            cmake -S cpp/ucis-xml -B cpp/build-c++$std -DCMAKE_CXX_STANDARD=$std
+            cmake --build cpp/build-c++$std -j
+            ctest --test-dir cpp/build-c++$std --output-on-failure
+          done
+      # C-2. The whole suite runs in about a second, so there is no reason to
+      # make this opt-in. The C writer's equivalent already caught a
+      # use-after-free that the ordinary build ran past cleanly.
+      - name: ucis_xml under AddressSanitizer and UBSan
+        run: |
+          cmake -S cpp/ucis-xml -B cpp/build-asan \
+            -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined -fno-sanitize-recover=all -g" \
+            -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined"
+          cmake --build cpp/build-asan -j
+          ctest --test-dir cpp/build-asan --output-on-failure
+      # C-4. T-1 and T-2: every example validates, and the corpus instantiates
+      # every complex type ucis.xsd declares.
+      - name: ucis_xml examples validate against the UCIS XSD
+        run: |
+          pip install xmlschema pytest
+          UCIS_XML_EXAMPLE_OUT=cpp/build/examples/out \
+            python3 -m pytest tests/ucis_xml -q \
+              --ignore=tests/ucis_xml/test_scale.py \
+              --ignore=tests/ucis_xml/test_docs.py
+      # The published C++ reference is extracted from the header by Hawkmoth,
+      # so it cannot drift -- but it can silently stop extracting. This asserts
+      # the reference still builds warning-free, still contains every publicly
+      # documented type, and still keeps internals out. On the PR path rather
+      # than only in the docs job, since the thing that breaks it is a source
+      # edit.
+      - name: C++ API reference still extracts
+        run: |
+          pip install sphinx hawkmoth libclang
+          python3 -m pytest tests/ucis_xml/test_docs.py -q
+      # L-3. A NOTICE file here would silently reintroduce the Apache-2.0 §4(d)
+      # obligation that the Apache-2.0 OR MIT dual licence exists to avoid, so
+      # adding one has to fail rather than pass unnoticed.
+      - name: no NOTICE file in the dual-licensed directory
+        run: |
+          if ls cpp/ucis-xml/NOTICE* 2>/dev/null; then
+            echo "cpp/ucis-xml is dual-licensed Apache-2.0 OR MIT; a NOTICE file"
+            echo "reintroduces the obligation that removes. See its README."
+            exit 1
+          fi
 
   docs:
     # BUILD ONLY. This workflow does not publish docs, by design.

@@ -1,0 +1,4 @@
+# Multicore scaling sweep.
+BlackParrot:1x1:hello
+BlackParrot:2x2:hello
+BlackParrot:4x4:hello

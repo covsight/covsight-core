@@ -1,0 +1,64 @@
+# Amalgamation manifest for the C UCIS write-streaming library.
+# Consumed by tools/amalgamate.py; see D1 of docs/ucis-writer-impl-plan.md.
+
+style = "stb"
+src = "c/ucis-writer/src"
+implementation_macro = "UCIS_WRITER_IMPLEMENTATION"
+implemented_macro = "UCIS_WRITER_IMPLEMENTED"
+amalgamated_macro = "UCIS_WRITER_AMALGAMATED"
+
+# The public declarations, copied verbatim and in this order. uw_public.h is the
+# descriptor API (D15) and is what a consumer needs; ucis_writer_api.h adds UCIS
+# 1.0 C API compatibility on top and depends on it.
+#
+# They are concatenated rather than left as separate files because the vendored
+# artifact is one header by definition (D1). A consumer who wants only the
+# descriptor API still gets the UCIS declarations -- they cost nothing but bytes,
+# and splitting the deliverable in two would defeat the point of amalgamating.
+decls = ["uw_public.h", "ucis_writer_api.h"]
+
+# Internal headers, in dependency order.
+impl_headers = [
+    "uw_config.h",
+    "uw_buf.h",
+    "uw_types.h",
+    "uw_text.h",
+    "uw_stack.h",
+    "uw_tables.h",
+    "uw_xml.h",
+    "uw_cvg.h",
+    "uw_api.h",
+]
+
+# Implementation units. Order matters only for readability: every function is
+# declared in a header above before it is used.
+impl_sources = [
+    "uw_buf.c",
+    "uw_text.c",
+    "uw_error.c",
+    "uw_stack.c",
+    "uw_tables.c",
+    "uw_xml.c",
+    "uw_cvg.c",
+    "uw_desc.c",
+    "uw_props.c",
+    "uw_api.c",
+]
+
+banner = """\
+/*
+ * ucis_writer.h - UCIS 1.0 write-streaming to UCIS-XML, in one file.
+ *
+ * GENERATED FILE - DO NOT EDIT.
+ * Regenerate with:  python3 tools/amalgamate.py --output c/ucis-writer/include/ucis_writer.h
+ * Sources:          c/ucis-writer/src/
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Usage: include this header anywhere for declarations. In exactly ONE
+ * translation unit, define UCIS_WRITER_IMPLEMENTATION before including it:
+ *
+ *     #define UCIS_WRITER_IMPLEMENTATION
+ *     #include "ucis_writer.h"
+ */
+"""

@@ -1,0 +1,83 @@
+# UCIS conformance registry -- section 91: negative conformance
+#
+# HAND-AUTHORED. A negative entry asserts that invalid input is *rejected*, not
+# that valid input is handled.
+#
+# These matter more for a documented format than for an implementation. A
+# third-party writer that produces one of these databases and is not told so
+# will ship it, and the corruption surfaces later as a coverage number nobody
+# can explain. "Reader must reject X" is part of the specification, so it needs
+# a row in the matrix like anything else.
+
+section:
+  number: 91
+  title: "Negative conformance"
+  notes: >
+    Inputs the mapping must refuse. Complements the combination table's X.10.
+
+features:
+  - id: N.1
+    title: "unknown scope_type value on read is an error, not a silent pass-through"
+    kind: negative
+    applies_to: [read]
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      A scope whose type the reader does not recognise cannot be traversed
+      correctly; treating it as a generic scope silently changes the shape of
+      the tree.
+
+  - id: N.2
+    title: "negative or non-integral coveritem count is rejected on write"
+    kind: negative
+    applies_to: [write]
+    backends:
+      parquet:
+        scope: core
+
+  - id: N.3
+    title: "cross scope referencing a coverpoint that does not exist is rejected"
+    kind: negative
+    applies_to: [write, read]
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Dangling coverpoint references survive a naive round trip because nothing
+      dereferences them until a query does.
+
+  - id: N.4
+    title: "duplicate (run_id, coveritem_id) in a measurement table is rejected"
+    kind: negative
+    applies_to: [write, merge]
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Two rows for one coveritem in one run double-count under any GROUP BY SUM
+      merge. The failure is invisible until the counts are compared to a
+      single-run read.
+
+  - id: N.5
+    title: "schema_version newer than the reader understands is refused, not guessed"
+    kind: negative
+    applies_to: [read]
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      The forward-compatible case is X.9 (unknown *namespace* rows are
+      preserved). A bumped schema_version means the semantics of known columns
+      may have changed, which is not something a reader can absorb quietly.
+
+  - id: N.6
+    title: "history node claiming UCIS_HISTORYNODE_MERGE with no contributing nodes is rejected"
+    kind: negative
+    applies_to: [write, merge]
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Provenance that claims a merge but names no inputs is worse than no
+      provenance, because it reads as complete.

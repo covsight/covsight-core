@@ -1,0 +1,98 @@
+# UCIS conformance registry -- section 25: XML interchange
+#
+# GENERATED SKELETON, HAND-MAINTAINED THEREAFTER.
+# Records intent only: what the backend is expected to do with each feature.
+# Status ("is it tested?", "is it documented?") is computed by
+# tools/gen_conformance_matrix.py and never written here.
+#
+# See docs/conformance/README.md.
+
+section:
+  number: 25
+  title: "XML interchange"
+  spec_ref: "§ 9"
+
+features:
+  - id: X25.1
+    title: "Round-trip: `ucis_OpenFromInterchangeFormat` ⇄ `ucis_WriteToInterchangeFormat`"
+    spec_ref: "§ 8.1"
+    kind: feature
+    backends:
+      parquet:
+        scope: out_of_scope
+        reason: >
+          XML interchange is a separate backend (covsight.core.xml) with its own
+          format plugin. Conversion runs through the UCIS object API, so the
+          Parquet mapping neither reads nor writes XML.
+
+  - id: X25.2
+    title: "Complete UCIS XML schema (top-level)"
+    spec_ref: "§ 9.4, § 9.14"
+    kind: feature
+    backends:
+      parquet:
+        scope: out_of_scope
+        reason: >
+          XML interchange is a separate backend (covsight.core.xml) with its own
+          format plugin. Conversion runs through the UCIS object API, so the
+          Parquet mapping neither reads nor writes XML.
+
+  - id: X25.3
+    title: "Schema fragments per coverage type (TOGGLE / CVG / COND / ASSERT / FSM / BLOCK / BRANCH)"
+    spec_ref: "§ 9.7–9.13"
+    kind: feature
+    backends:
+      parquet:
+        scope: out_of_scope
+        reason: >
+          XML interchange is a separate backend (covsight.core.xml) with its own
+          format plugin. Conversion runs through the UCIS object API, so the
+          Parquet mapping neither reads nor writes XML.
+
+  - id: X25.4
+    title: "Common complex types: `NAME_VALUE`, `SOURCE_FILE`, `LINE_ID`, `STATEMENT_ID`, `DIMENSION`, `BIN`, `BIN_CONTENTS`"
+    spec_ref: "§ 9.3"
+    kind: feature
+    backends:
+      parquet:
+        scope: out_of_scope
+        reason: >
+          XML interchange is a separate backend (covsight.core.xml) with its own
+          format plugin. Conversion runs through the UCIS object API, so the
+          Parquet mapping neither reads nor writes XML.
+
+  - id: X25.5
+    title: "History-node XML schema"
+    spec_ref: "§ 9.5"
+    kind: feature
+    backends:
+      parquet:
+        scope: out_of_scope
+        reason: >
+          XML interchange is a separate backend (covsight.core.xml) with its own
+          format plugin. Conversion runs through the UCIS object API, so the
+          Parquet mapping neither reads nor writes XML.
+
+  - id: X25.6
+    title: "Instance-coverage XML schema"
+    spec_ref: "§ 9.6"
+    kind: feature
+    backends:
+      parquet:
+        scope: out_of_scope
+        reason: >
+          XML interchange is a separate backend (covsight.core.xml) with its own
+          format plugin. Conversion runs through the UCIS object API, so the
+          Parquet mapping neither reads nor writes XML.
+
+  - id: X25.7
+    title: "User-defined attribute encoding"
+    spec_ref: "§ 9.3.12"
+    kind: feature
+    backends:
+      parquet:
+        scope: out_of_scope
+        reason: >
+          XML interchange is a separate backend (covsight.core.xml) with its own
+          format plugin. Conversion runs through the UCIS object API, so the
+          Parquet mapping neither reads nor writes XML.

@@ -8,6 +8,7 @@ import json
 from .string_table import StringTable
 from .scope_tree import ScopeTreeReader
 from .counts import CountsReader
+from .multirun import resolve_counts
 from .history import HistoryReader
 from .sources import SourcesReader
 from .attrs import AttrsReader
@@ -76,11 +77,29 @@ def _fixup_instance_du_links(db: MemUCIS) -> None:
 class NcdbReader:
     """Read an NCDB .cdb ZIP file and return a populated MemUCIS."""
 
-    def read(self, path: str) -> MemUCIS:
+    def read(self, path: str, runs=None) -> MemUCIS:
+        """Read an NCDB archive.
+
+        Args:
+            path: Archive path.
+            runs: For a multi-run archive, which runs to view -- a single run
+                id, a sequence of ids, or None for all of them merged. A
+                single-run archive ignores this.
+
+        Returns:
+            A populated ``MemUCIS``.
+
+        Raises:
+            RunTableError: If a named run is not present.
+        """
         with zipfile.ZipFile(path, "r") as zf:
             names = zf.namelist()
             # Read all members into a dict for uniform access
             zf_data = {n: zf.read(n) for n in names}
+            # Multi-run archives keep one count array per run; merging the
+            # selected ones here means everything downstream sees a single
+            # coherent database, exactly as for a single-run file.
+            selected_counts = resolve_counts(zf, runs)
 
         manifest_bytes    = zf_data[MEMBER_MANIFEST]
         strings_bytes     = zf_data[MEMBER_STRINGS]
@@ -114,7 +133,7 @@ class NcdbReader:
         file_handles = SourcesReader().deserialize(sources_bytes)
 
         # Counts (as a flat iterator)
-        counts = CountsReader().deserialize(counts_bytes)
+        counts = selected_counts
         counts_iter = iter(counts)
 
         # Build MemUCIS

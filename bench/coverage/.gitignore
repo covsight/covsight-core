@@ -1,0 +1,6 @@
+example/obj_dir/
+example/coverage.dat
+example/coverage.cdb
+rtlmeter-out/
+results.jsonl
+results.csv

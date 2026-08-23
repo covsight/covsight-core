@@ -1,0 +1,149 @@
+# UCIS conformance registry -- section 22: Formal verification
+#
+# GENERATED SKELETON, HAND-MAINTAINED THEREAFTER.
+# Records intent only: what the backend is expected to do with each feature.
+# Status ("is it tested?", "is it documented?") is computed by
+# tools/gen_conformance_matrix.py and never written here.
+#
+# See docs/conformance/README.md.
+
+section:
+  number: 22
+  title: "Formal verification"
+  spec_ref: "§ 8.19"
+
+features:
+  - id: FM.1
+    title: "Formal-status enum + `ucis_SetFormalStatus` / `ucis_GetFormalStatus`"
+    spec_ref: "§ 8.19.3–5"
+    kind: feature
+    backends:
+      parquet:
+        scope: extended
+        reason: >
+          Formal verification results. A simulation-only tool produces none, and
+          a reader that cannot interpret them still reads every count correctly,
+          so requiring them would exclude conforming implementations for no
+          interoperability gain.
+    notes: >
+      The formal table carries status, radius and witness per assertion bin,
+      run-scoped because a proof status comes from a run. Merging is
+      precedence, not sum -- see X.4.
+
+  - id: FM.2
+    title: "Formal-radius accessors (`SetFormalRadius`, `GetFormalRadius`)"
+    spec_ref: "§ 8.19.6–7"
+    kind: feature
+    backends:
+      parquet:
+        scope: extended
+        reason: >
+          Formal verification results. A simulation-only tool produces none, and
+          a reader that cannot interpret them still reads every count correctly,
+          so requiring them would exclude conforming implementations for no
+          interoperability gain.
+    notes: >
+      The formal table carries status, radius and witness per assertion bin,
+      run-scoped because a proof status comes from a run. Merging is
+      precedence, not sum -- see X.4.
+
+  - id: FM.3
+    title: "Formal-witness accessors (`SetFormalWitness`, `GetFormalWitness`)"
+    spec_ref: "§ 8.19.8–9"
+    kind: feature
+    backends:
+      parquet:
+        scope: extended
+        reason: >
+          Formal verification results. A simulation-only tool produces none, and
+          a reader that cannot interpret them still reads every count correctly,
+          so requiring them would exclude conforming implementations for no
+          interoperability gain.
+    notes: >
+      The formal table carries status, radius and witness per assertion bin,
+      run-scoped because a proof status comes from a run. Merging is
+      precedence, not sum -- see X.4.
+
+  - id: FM.4
+    title: "Formally-unreachable coveritem: `Set/GetFormallyUnreachableCoverTest`"
+    spec_ref: "§ 8.19.11–12"
+    kind: feature
+    backends:
+      parquet:
+        scope: deferred
+        reason: >
+          The formal table carries per-bin status, radius and witness. Formal
+          environments, their test and assumption associations, and the
+          coverage-context constants have no representation yet; adding them is
+          a schema extension, not a test.
+        adr: docs/adr/0003-parquet-backend.md
+
+  - id: FM.5
+    title: "Formal-env API: `AddFormalEnv`, `FormalEnvGetData`, `NextFormalEnv`"
+    spec_ref: "§ 8.19.15–17"
+    kind: feature
+    backends:
+      parquet:
+        scope: deferred
+        reason: >
+          The formal table carries per-bin status, radius and witness. Formal
+          environments, their test and assumption associations, and the
+          coverage-context constants have no representation yet; adding them is
+          a schema extension, not a test.
+        adr: docs/adr/0003-parquet-backend.md
+
+  - id: FM.6
+    title: "Test↔env association: `AssocFormalInfoTest`"
+    spec_ref: "§ 8.19.18"
+    kind: feature
+    backends:
+      parquet:
+        scope: deferred
+        reason: >
+          The formal table carries per-bin status, radius and witness. Formal
+          environments, their test and assumption associations, and the
+          coverage-context constants have no representation yet; adding them is
+          a schema extension, not a test.
+        adr: docs/adr/0003-parquet-backend.md
+
+  - id: FM.7
+    title: "Per-test formal info: `FormalTestGetInfo`"
+    spec_ref: "§ 8.19.20"
+    kind: feature
+    backends:
+      parquet:
+        scope: deferred
+        reason: >
+          The formal table carries per-bin status, radius and witness. Formal
+          environments, their test and assumption associations, and the
+          coverage-context constants have no representation yet; adding them is
+          a schema extension, not a test.
+        adr: docs/adr/0003-parquet-backend.md
+
+  - id: FM.8
+    title: "Assumption↔env association: `AssocAssumptionFormalEnv`, `NextFormalEnvAssumption`"
+    spec_ref: "§ 8.19.21–22"
+    kind: feature
+    backends:
+      parquet:
+        scope: deferred
+        reason: >
+          The formal table carries per-bin status, radius and witness. Formal
+          environments, their test and assumption associations, and the
+          coverage-context constants have no representation yet; adding them is
+          a schema extension, not a test.
+        adr: docs/adr/0003-parquet-backend.md
+
+  - id: FM.9
+    title: "Formal-coverage-context constants: `STIMULUS`, `RESPONSE`, `TARGETED`, `ANCILLARY`, `INCONCLUSIVE_ANALYSIS`"
+    spec_ref: "§ 8.19.19"
+    kind: feature
+    backends:
+      parquet:
+        scope: deferred
+        reason: >
+          The formal table carries per-bin status, radius and witness. Formal
+          environments, their test and assumption associations, and the
+          coverage-context constants have no representation yet; adding them is
+          a schema extension, not a test.
+        adr: docs/adr/0003-parquet-backend.md

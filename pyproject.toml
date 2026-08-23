@@ -24,11 +24,19 @@ Issues = "https://github.com/covsight/covsight-core/issues"
 [project.optional-dependencies]
 accel = ["cffi>=1.15"]
 dev = ["pytest>=7.0", "pytest-cov"]
-validate = ["jsonschema>=4.0"]
+validate = ["jsonschema>=4.0", "xmlschema>=2.0"]
 hjson = ["hjson>=3.0"]
+# Columnar backend.  pyarrow alone covers the raw-Parquet dataset; the
+# iceberg/duckdb extras are only needed for the ephemeral-Iceberg tests and the
+# benchmark query adapters.
+parquet = ["pyarrow>=14.0"]
+iceberg = ["pyarrow>=14.0", "pyiceberg[sql-sqlite]>=0.7"]
+duckdb = ["pyarrow>=14.0", "duckdb>=1.0"]
 
 [project.entry-points."covsight.formats.db"]
 ncdb = "covsight.core.ncdb.format_plugin:NcdbFormatPlugin"
+parquet = "covsight.core.parquet.format_plugin:ParquetFormatPlugin"
+xml = "covsight.core.xml.format_plugin:XmlFormatPlugin"
 
 [tool.setuptools.packages.find]
 where = ["python"]
@@ -41,3 +49,7 @@ root = "."
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+  "iceberg_rest: needs the apache/iceberg-rest-fixture container (opt-in)",
+  "ucis_feature(*ids, level, surface, backend): conformance evidence for registry feature IDs (docs/conformance/features/)",
+]

@@ -18,6 +18,7 @@
 """In-memory toggle coverage scope."""
 
 from covsight.core.mem.mem_scope import MemScope
+from covsight.core.mem.mem_toggle_props import ToggleProperties
 from covsight.core.api import ScopeTypeT
 from covsight.core.api import SourceT
 from covsight.core.api import FlagsT
@@ -28,7 +29,7 @@ from covsight.core.api import IntProperty
 from covsight.core.api import StrProperty
 
 
-class MemToggleScope(MemScope):
+class MemToggleScope(ToggleProperties, MemScope):
     """In-memory implementation of a toggle coverage scope.
 
     Represents a single signal with toggle coverage tracking.
@@ -82,70 +83,8 @@ class MemToggleScope(MemScope):
 
     def getTotalToggle01(self) -> int:
         """Sum of all 0->1 transition counts across bins."""
-        from covsight.core.api import CoverTypeT
-        total = 0
-        for item in self.m_cover_items:
-            if item.m_data is not None and item.m_data.type == CoverTypeT.TOGGLEBIN:
-                if '0->1' in item.m_name or '01' in item.m_name:
-                    total += item.m_data.data
-        return total
+        return self._total_toggle("0->1", "01")
 
     def getTotalToggle10(self) -> int:
         """Sum of all 1->0 transition counts across bins."""
-        from covsight.core.api import CoverTypeT
-        total = 0
-        for item in self.m_cover_items:
-            if item.m_data is not None and item.m_data.type == CoverTypeT.TOGGLEBIN:
-                if '1->0' in item.m_name or '10' in item.m_name:
-                    total += item.m_data.data
-        return total
-
-    # --- Property overrides ---
-
-    def getIntProperty(self, coverindex, property):
-        if property == IntProperty.TOGGLE_TYPE:
-            return int(self._toggle_type)
-        elif property == IntProperty.TOGGLE_DIR:
-            return int(self._toggle_dir)
-        elif property == IntProperty.TOGGLE_METRIC:
-            return int(self._toggle_metric)
-        elif property == IntProperty.TOGGLE_COVERED:
-            # Covered if at least one bin of each transition direction has count > 0
-            from covsight.core.api import CoverTypeT
-            has01 = any(
-                item.m_data is not None
-                and item.m_data.type == CoverTypeT.TOGGLEBIN
-                and item.m_data.data > 0
-                and ('0->1' in item.m_name or '01' in item.m_name)
-                for item in self.m_cover_items
-            )
-            has10 = any(
-                item.m_data is not None
-                and item.m_data.type == CoverTypeT.TOGGLEBIN
-                and item.m_data.data > 0
-                and ('1->0' in item.m_name or '10' in item.m_name)
-                for item in self.m_cover_items
-            )
-            return 1 if (has01 and has10) else 0
-        return super().getIntProperty(coverindex, property)
-
-    def setIntProperty(self, coverindex, property, value):
-        if property == IntProperty.TOGGLE_TYPE:
-            self._toggle_type = ToggleTypeT(value)
-        elif property == IntProperty.TOGGLE_DIR:
-            self._toggle_dir = ToggleDirT(value)
-        elif property == IntProperty.TOGGLE_METRIC:
-            self._toggle_metric = ToggleMetricT(value)
-        else:
-            super().setIntProperty(coverindex, property, value)
-
-    def getStringProperty(self, coverindex, property):
-        if property == StrProperty.TOGGLE_CANON_NAME:
-            return self._canonical_name
-        return super().getStringProperty(coverindex, property)
-
-    def setStringProperty(self, coverindex, property, value):
-        if property == StrProperty.TOGGLE_CANON_NAME:
-            self._canonical_name = value
-        else:
-            super().setStringProperty(coverindex, property, value)
+        return self._total_toggle("1->0", "10")

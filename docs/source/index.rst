@@ -10,6 +10,8 @@ analysis ecosystem. It provides:
   entirely by Python objects.
 * The **NCDB format** — a compact, ZIP-based binary format (``.cdb``) for
   storing and exchanging coverage databases.
+* The **Parquet backend** — a columnar, multi-run dataset (raw Parquet or
+  Apache Iceberg) that merges on read and answers SQL queries.
 * A **format plugin registry** — a ``setuptools`` entry-points mechanism so
   third-party packages can add new database and report formats.
 
@@ -24,8 +26,14 @@ analysis ecosystem. It provides:
      - Author and analyse verification testplans
    * - :doc:`reference/python-api/index`
      - Complete API reference for every class and enum
+   * - :doc:`getting-started/parquet-query`
+     - Query and merge coverage columnar with Parquet
    * - :doc:`reference/formats/ncdb`
      - NCDB binary format specification
+   * - :doc:`reference/backends/index`
+     - How the in-memory, NCDB and Parquet backends relate
+   * - :doc:`reference/cpp-api/index`
+     - Add UCIS-XML coverage output to your own tool, with one C++ header
    * - :doc:`reference/migration`
      - Migrating from pyucis
 
@@ -36,6 +44,7 @@ analysis ecosystem. It provides:
 
    getting-started/quickstart
    getting-started/testplans
+   getting-started/parquet-query
 
 .. toctree::
    :maxdepth: 2

@@ -1,0 +1,85 @@
+# UCIS conformance registry -- section 3: Versioning
+#
+# GENERATED SKELETON, HAND-MAINTAINED THEREAFTER.
+# Records intent only: what the backend is expected to do with each feature.
+# Status ("is it tested?", "is it documented?") is computed by
+# tools/gen_conformance_matrix.py and never written here.
+#
+# See docs/conformance/README.md.
+
+section:
+  number: 3
+  title: "Versioning"
+  spec_ref: "§ 7, § 8.18"
+
+features:
+  - id: V3.1
+    title: "`ucis_GetAPIVersion()` — version of the linked API library"
+    spec_ref: "§ 8.18.1"
+    kind: feature
+    backends:
+      parquet:
+        scope: out_of_scope
+        reason: >
+          A property of the linked API library, not of the data. Two readers of
+          the same dataset legitimately answer differently.
+
+  - id: V3.2
+    title: "`ucis_GetDBVersion(db)` — version of the in-memory DB schema"
+    spec_ref: "§ 8.18.2"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Carried by schema_version in table metadata and by the per-node version
+      on history_nodes. Version identity is what makes a refusal to read a
+      newer dataset possible (N.5).
+
+  - id: V3.3
+    title: "`ucis_GetFileVersion(file)` — version recorded in a file"
+    spec_ref: "§ 8.18.3"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Carried by schema_version in table metadata and by the per-node version
+      on history_nodes. Version identity is what makes a refusal to read a
+      newer dataset possible (N.5).
+
+  - id: V3.4
+    title: "`ucis_GetHistoryNodeVersion(node)` — version a history node was written under"
+    spec_ref: "§ 8.18.4"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Carried by schema_version in table metadata and by the per-node version
+      on history_nodes. Version identity is what makes a refusal to read a
+      newer dataset possible (N.5).
+
+  - id: V3.5
+    title: "`ucis_GetVersionStringProperty(versionH, prop)`"
+    spec_ref: "§ 8.18.5"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Carried by schema_version in table metadata and by the per-node version
+      on history_nodes. Version identity is what makes a refusal to read a
+      newer dataset possible (N.5).
+
+  - id: V3.6
+    title: "Version string properties: `UCIS_STR_VER_STANDARD`, `VER_STANDARD_VERSION`, `VER_VENDOR_ID`, `VER_VENDOR_TOOL`, `VER_VENDOR_VERSION`"
+    spec_ref: "§ 7"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Carried by schema_version in table metadata and by the per-node version
+      on history_nodes. Version identity is what makes a refusal to read a
+      newer dataset possible (N.5).

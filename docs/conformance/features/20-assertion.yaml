@@ -1,0 +1,74 @@
+# UCIS conformance registry -- section 20: Assertion and cover (SVA/PSL)
+#
+# GENERATED SKELETON, HAND-MAINTAINED THEREAFTER.
+# Records intent only: what the backend is expected to do with each feature.
+# Status ("is it tested?", "is it documented?") is computed by
+# tools/gen_conformance_matrix.py and never written here.
+#
+# See docs/conformance/README.md.
+
+section:
+  number: 20
+  title: "Assertion and cover (SVA/PSL)"
+  spec_ref: "§ 6.6, § 9.10"
+
+features:
+  - id: AS.1
+    title: "`UCIS_ASSERT` scope"
+    spec_ref: "§ 6.6.2"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+
+  - id: AS.2
+    title: "`UCIS_COVER` scope (cover-property)"
+    spec_ref: "§ 6.6.1"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+
+  - id: AS.3
+    title: "Assertion counter bins: `PASSBIN`, `FAILBIN`, `VACUOUSBIN`, `DISABLEDBIN`, `ATTEMPTBIN`, `ACTIVEBIN`, `PEAKACTIVEBIN`"
+    spec_ref: "§ 6.6.2"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+
+  - id: AS.4
+    title: "Cover-property bin: `UCIS_COVERBIN`"
+    spec_ref: "§ 6.6.1"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+
+  - id: AS.5
+    title: "Sequence bin: `UCIS_SCBIN`"
+    spec_ref: "§ 6.6.1"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+
+  - id: AS.6
+    title: "Immediate-assertion marker: `UCIS_IS_IMMEDIATE_ASSERT`"
+    spec_ref: "§ 6.6.2"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+
+  - id: AS.7
+    title: "XML schema: `ASSERTION`"
+    spec_ref: "§ 9.10"
+    kind: feature
+    backends:
+      parquet:
+        scope: out_of_scope
+        reason: >
+          XML interchange is a separate backend (covsight.core.xml) with its own
+          format plugin. Conversion runs through the UCIS object API, so the
+          Parquet mapping neither reads nor writes XML.

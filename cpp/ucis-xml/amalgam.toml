@@ -1,0 +1,59 @@
+# Amalgamation manifest for the header-only C++ UCIS-XML writer.
+# Consumed by tools/amalgamate.py; see D-9 of docs/ucis-xml-cpp-impl-plan.md.
+#
+# Header-only rather than STB-style: the artifact is `#pragma once` and `inline`
+# throughout, so there is no implementation macro and no second inclusion mode.
+
+style = "header-only"
+src = "cpp/ucis-xml/src"
+
+# Dependency order. Each module includes only the one above it, so this list is
+# also the module dependency chain.
+parts = [
+    "ux_config.hpp",
+    "ux_util.hpp",
+    "ux_buf.hpp",
+    "ux_text.hpp",
+    "ux_error.hpp",
+    "ux_arena.hpp",
+    "ux_key.hpp",
+    "ux_intern.hpp",
+    "ux_stage.hpp",
+    "ux_render.hpp",
+    "ux_render_code.hpp",
+    "ux_render_func.hpp",
+    "ux_spool.hpp",
+    "ux_doc.hpp",
+    "ux_api.hpp",
+    "ux_points.hpp",
+]
+
+banner = """\
+// ucis_xml.hpp - schema-valid UCIS-XML coverage output, in one header.
+//
+// GENERATED FILE - DO NOT EDIT.
+// Regenerate with:
+//   python3 tools/amalgamate.py --manifest cpp/ucis-xml/amalgam.toml
+//                               --output cpp/ucis-xml/include/ucis_xml.hpp
+// Sources: cpp/ucis-xml/src/
+//
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+// Copyright the covsight contributors.
+//
+// Header-only and dependency-free. Requires C++17. Include it anywhere; there
+// is no implementation macro and nothing to link.
+//
+//     #include "ucis_xml.hpp"
+//     namespace ux = ucisxml;
+//
+//     ux::CoverageWriter cov;
+//     cov.openFile("coverage.xml");
+//     cov.tool(ux::Tool().name("mytool").version("1.0").vendorId("MINE"));
+//     cov.test(ux::Test().name("run1").passed(true));
+//     cov.sources({"rtl/alu.sv"});
+//     {
+//         ux::Scope s = cov.scope("top.u_alu", "alu");
+//         s.line("rtl/alu.sv", 42, 17);
+//     }
+//     if (!cov.close()) fprintf(stderr, "%s\\n", cov.error());
+"""

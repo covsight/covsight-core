@@ -1,3 +1,6 @@
 sphinx
 sphinx-rtd-theme
 sphinx-js>=5.0.3
+# C/C++ API reference extraction; see reference/cpp-api/.
+hawkmoth>=0.22.0
+libclang>=18.1.1

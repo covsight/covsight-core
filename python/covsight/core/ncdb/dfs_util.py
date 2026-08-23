@@ -49,3 +49,101 @@ def dfs_scope_list(db) -> list:
 
     db._dfs_scope_cache = result
     return result
+
+
+# ── Flat bin addressing ───────────────────────────────────────────────────
+#
+# ``counts.bin`` is a flat array indexed by "flat bin index", and per-test
+# associations, formal results and the parquet coveritem ids are all keyed by
+# that same index.  The ordering is defined by ``ScopeTreeWriter``: a scope
+# contributes its own cover bins, *then* its children contribute theirs
+# (pre-order), and a folded toggle-pair BRANCH contributes exactly two bins in
+# the canonical order 0->1, 1->0 -- which is *not* necessarily the order
+# ``coverItems()`` yields them in.
+#
+# Everything that needs to turn a (scope, coveritem) pair into a flat index
+# must go through here.  Two independent implementations of this mapping would
+# drift silently, and the failure mode is not a crash but coverage attributed
+# to the wrong bin.
+
+
+def scope_bin_names(scope) -> list:
+    """Cover-bin names for *scope*, in flat-bin-index order.
+
+    For a folded toggle pair this is the canonical ``0 -> 1``, ``1 -> 0``
+    ordering that ``scope_tree.bin`` encodes implicitly, regardless of the
+    order the two bins were created in.
+    """
+    if _is_toggle_pair(scope):
+        return [TOGGLE_BIN_0_TO_1, TOGGLE_BIN_1_TO_0]
+    return [ci.getName() for ci in scope.coverItems(CoverTypeT.ALL)]
+
+
+def scope_bin_count(scope) -> int:
+    """Number of flat bins *scope* itself contributes (excluding children)."""
+    if _is_toggle_pair(scope):
+        return 2
+    return len(list(scope.coverItems(CoverTypeT.ALL)))
+
+
+def scope_bin_bases(db) -> dict:
+    """Map ``id(scope)`` → the flat bin index of that scope's first bin.
+
+    A scope with no bins maps to the index its first bin *would* have, so
+    ``base + local_index`` is well defined for callers that already hold a
+    valid local index.
+    """
+    cached = getattr(db, '_scope_bin_base_cache', None)
+    if cached is not None:
+        return cached
+
+    bases, next_index = {}, 0
+    for scope in dfs_scope_list(db):
+        bases[id(scope)] = next_index
+        next_index += scope_bin_count(scope)
+
+    db._scope_bin_base_cache = bases
+    return bases
+
+
+def scope_bin_base(db, scope) -> int:
+    """Flat bin index of *scope*'s first cover bin.
+
+    Raises ``KeyError`` if *scope* is not reachable in *db*'s DFS -- silently
+    returning 0 would point associations at the first bin in the database.
+    """
+    bases = scope_bin_bases(db)
+    try:
+        return bases[id(scope)]
+    except KeyError:
+        raise KeyError(
+            "scope %r is not part of this database's DFS traversal; it cannot "
+            "be assigned a flat bin index" % (scope.getScopeName(),)) from None
+
+
+def flat_bin_index(db, scope, local_index: int) -> int:
+    """Flat bin index of the *local_index*'th cover bin of *scope*."""
+    n = scope_bin_count(scope)
+    if not 0 <= local_index < n:
+        raise IndexError(
+            "local bin index %d out of range for scope %r (%d bins)"
+            % (local_index, scope.getScopeName(), n))
+    return scope_bin_base(db, scope) + local_index
+
+
+def iter_flat_bins(db):
+    """Yield ``(flat_index, scope, local_index, name)`` for every bin in *db*.
+
+    Flat order, i.e. the order of ``counts.bin``.  ``name`` comes from
+    :func:`scope_bin_names`, so toggle pairs are reported canonically.
+    """
+    flat = 0
+    for scope in dfs_scope_list(db):
+        for local_index, name in enumerate(scope_bin_names(scope)):
+            yield flat, scope, local_index, name
+            flat += 1
+
+
+def total_bin_count(db) -> int:
+    """Total number of flat bins in *db* -- the length of ``counts.bin``."""
+    return sum(scope_bin_count(s) for s in dfs_scope_list(db))

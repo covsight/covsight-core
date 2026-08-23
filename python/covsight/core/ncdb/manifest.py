@@ -131,16 +131,97 @@ class Manifest:
             m.n_associations       = 0
         return m
 
+    #: Domain-separation tag for the v2 schema-hash construction.  Bumping this
+    #: string is how the construction is versioned; a v1 and a v2 hash can never
+    #: compare equal by accident, because the prefixes differ too.
+    _SCHEMA_HASH_V2_TAG = b"ncdb-schema-v2\x00"
+
     @staticmethod
-    def compute_schema_hash(scope_tree_bytes: bytes) -> str:
-        """SHA-256 of the *uncompressed* scope_tree.bin content."""
-        digest = hashlib.sha256(scope_tree_bytes).hexdigest()
-        return f"sha256:{digest}"
+    def compute_schema_hash(scope_tree_bytes: bytes,
+                            strings_bytes: bytes = None) -> str:
+        """Fingerprint of the *bin space* — its shape **and** its names.
+
+        ``scope_tree.bin`` stores string-table *references*, not strings, so it
+        alone does not identify a design: two unrelated databases with the same
+        shape (same scope types, same bin counts, same nesting) serialize to
+        byte-identical ``scope_tree.bin`` even when every scope and bin is named
+        differently.  Hashing it alone therefore made the merger's same-schema
+        fast path treat unrelated designs as interchangeable, adding one
+        design's counts into the other's bins and reporting the result under the
+        first source's names.
+
+        ``strings.bin`` is folded in to close that hole.  This is sound only
+        because the string table is serialized immediately after the scope-tree
+        walk and before any per-run member (history, attrs, tags), so at that
+        point it holds exactly the schema strings — scope and coveritem names —
+        and nothing that varies between runs of the same design.  Fast merge is
+        therefore preserved for genuinely identical designs.
+
+        Passing *strings_bytes* selects the v2 construction, tagged and
+        length-prefixed so the two inputs cannot be confused by concatenation.
+        Omitting it reproduces the v1 hash, for reading databases written
+        before this change.
+        """
+        if strings_bytes is None:
+            digest = hashlib.sha256(scope_tree_bytes).hexdigest()
+            return f"sha256:{digest}"
+        h = hashlib.sha256()
+        h.update(Manifest._SCHEMA_HASH_V2_TAG)
+        h.update(_enc_varint(len(scope_tree_bytes)))
+        h.update(scope_tree_bytes)
+        h.update(_enc_varint(len(strings_bytes)))
+        h.update(strings_bytes)
+        return f"sha256v2:{h.hexdigest()}"
+
+    @staticmethod
+    def schema_fingerprint(schema_hash: str) -> int:
+        """Fold a ``schema_hash`` string into the u64 stored in ``assoc/*``.
+
+        The association members identify the bin space they were built against
+        by a 64-bit fingerprint rather than the full digest, because the value
+        is repeated in every member header.  The derivation is deliberately
+        trivial so that all three NCDB implementations agree without sharing
+        code: **the first 8 bytes of the SHA-256 digest, big-endian**, i.e. the
+        first 16 hex characters read as a hexadecimal number.
+
+        Truncation is safe here: the fingerprint guards against *accidentally*
+        pairing associations with the wrong database, not against an adversary
+        constructing a collision.
+
+        A ``schema_hash`` that is empty or carries an unrecognized prefix
+        yields 0, which readers must treat as "unknown" — never as a match.
+
+        Note that only the ``sha256v2:`` construction covers bin *names*; a
+        fingerprint derived from a v1 hash identifies the bin space's shape
+        alone.  Association members should be written against v2 hashes.
+        """
+        if not schema_hash:
+            return 0
+        for prefix in ("sha256v2:", "sha256:"):
+            if schema_hash.startswith(prefix):
+                hex_digest = schema_hash[len(prefix):]
+                break
+        else:
+            return 0
+        if len(hex_digest) < 16:
+            return 0
+        try:
+            return int(hex_digest[:16], 16)
+        except ValueError:
+            return 0
 
     @classmethod
     def build(cls, db, scope_tree_bytes: bytes,
-              counts: list, history_nodes: list) -> "Manifest":
-        """Build a Manifest from a UCIS database and serialized members."""
+              counts: list, history_nodes: list,
+              strings_bytes: bytes = None) -> "Manifest":
+        """Build a Manifest from a UCIS database and serialized members.
+
+        *strings_bytes* should be the serialized string table; supplying it
+        selects the v2 schema hash, which is the one that actually identifies
+        the design.  It is optional only so that callers constructing a
+        Manifest for comparison against a legacy database can reproduce a v1
+        hash.
+        """
         from covsight.core.api import ScopeTypeT
         from covsight.core.api import CoverTypeT
 
@@ -162,5 +243,5 @@ class Manifest:
             test_count=test_count,
             total_hits=total_hits,
             covered_bins=covered_bins,
-            schema_hash=cls.compute_schema_hash(scope_tree_bytes),
+            schema_hash=cls.compute_schema_hash(scope_tree_bytes, strings_bytes),
         )

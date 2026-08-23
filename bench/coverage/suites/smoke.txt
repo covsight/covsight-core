@@ -1,0 +1,2 @@
+# Smallest end-to-end check: validates the whole pipeline quickly.
+OpenTitan:default:hello

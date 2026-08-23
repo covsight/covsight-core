@@ -1,0 +1,117 @@
+# UCIS conformance registry -- section 26: Database-level objects
+#
+# GENERATED SKELETON, HAND-MAINTAINED THEREAFTER.
+# Records intent only: what the backend is expected to do with each feature.
+# Status ("is it tested?", "is it documented?") is computed by
+# tools/gen_conformance_matrix.py and never written here.
+#
+# See docs/conformance/README.md.
+
+section:
+  number: 26
+  title: "Database-level objects"
+  spec_ref: "§ 3.4"
+
+features:
+  - id: DB.1
+    title: "Counts on coveritems"
+    spec_ref: "§ 3.4.1"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      The object kinds the mapping is built out of. DB.9 lands in table
+      metadata alongside schema_version.
+
+  - id: DB.2
+    title: "Attributes (typed, user-defined) on any object"
+    spec_ref: "§ 3.4.2"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      The object kinds the mapping is built out of. DB.9 lands in table
+      metadata alongside schema_version.
+
+  - id: DB.3
+    title: "Flags on scopes and coveritems"
+    spec_ref: "§ 3.4.3"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      The object kinds the mapping is built out of. DB.9 lands in table
+      metadata alongside schema_version.
+
+  - id: DB.4
+    title: "Tags on objects"
+    spec_ref: "§ 3.4.4"
+    kind: feature
+    backends:
+      parquet:
+        scope: extended
+        reason: >
+          Tags on objects; extended for the same reason as T13.*.
+    notes: >
+      The object kinds the mapping is built out of. DB.9 lands in table
+      metadata alongside schema_version.
+
+  - id: DB.5
+    title: "Weights, goals, limits"
+    spec_ref: "§ 3.4.5"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      The object kinds the mapping is built out of. DB.9 lands in table
+      metadata alongside schema_version.
+
+  - id: DB.6
+    title: "Typed properties"
+    spec_ref: "§ 3.4.6"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      The object kinds the mapping is built out of. DB.9 lands in table
+      metadata alongside schema_version.
+
+  - id: DB.7
+    title: "Source-file tables"
+    spec_ref: "§ 3.4.7"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      The object kinds the mapping is built out of. DB.9 lands in table
+      metadata alongside schema_version.
+
+  - id: DB.8
+    title: "Error handler"
+    spec_ref: "§ 3.4.8"
+    kind: feature
+    backends:
+      parquet:
+        scope: out_of_scope
+        reason: >
+          API-level error reporting, registered per process. No persistent
+          representation in the dataset. Same decision as E2.1-E2.3; listed
+          separately in § 3.4 because the spec counts the handler among the
+          database-level objects.
+
+  - id: DB.9
+    title: "DB-level vendor / standard / version identifying strings (manifest)"
+    spec_ref: "§ 7"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      The object kinds the mapping is built out of. DB.9 lands in table
+      metadata alongside schema_version.

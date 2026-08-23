@@ -1,0 +1,136 @@
+# UCIS conformance registry -- section 1: Database lifecycle and I/O
+#
+# GENERATED SKELETON, HAND-MAINTAINED THEREAFTER.
+# Records intent only: what the backend is expected to do with each feature.
+# Status ("is it tested?", "is it documented?") is computed by
+# tools/gen_conformance_matrix.py and never written here.
+#
+# See docs/conformance/README.md.
+
+section:
+  number: 1
+  title: "Database lifecycle and I/O"
+  spec_ref: "§ 8.1"
+
+features:
+  - id: L1.1
+    title: "`ucis_Open(name)` — in-memory DB, optionally populated from a file"
+    spec_ref: "§ 8.1.5"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Opening and closing a Parquet dataset as a UCIS database is the
+      backend's entry point.
+
+  - id: L1.2
+    title: "`ucis_Close(db)` — invalidate handle, release memory"
+    spec_ref: "§ 8.1.4"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Opening and closing a Parquet dataset as a UCIS database is the
+      backend's entry point.
+
+  - id: L1.3
+    title: "`ucis_Write(db, file, scope, recurse, covertype)` — persist subset to file"
+    spec_ref: "§ 8.1.13"
+    kind: feature
+    backends:
+      parquet:
+        scope: deferred
+        reason: >
+          Filtered write (subset by scope, recurse and covertype) is not
+          implemented; the loader writes a whole dataset. The filter is a query
+          the mapping can express, so this is unbuilt rather than
+          unrepresentable.
+        adr: docs/adr/0003-parquet-backend.md
+
+  - id: L1.4
+    title: "`ucis_OpenFromInterchangeFormat(file)` — load from XML interchange"
+    spec_ref: "§ 8.1.6"
+    kind: feature
+    backends:
+      parquet:
+        scope: out_of_scope
+        reason: >
+          XML interchange is a separate backend (covsight.core.xml) with its own
+          format plugin. Conversion runs through the UCIS object API, so the
+          Parquet mapping neither reads nor writes XML.
+
+  - id: L1.5
+    title: "`ucis_WriteToInterchangeFormat(db, file)` — emit XML interchange"
+    spec_ref: "§ 8.1.14"
+    kind: feature
+    backends:
+      parquet:
+        scope: out_of_scope
+        reason: >
+          XML interchange is a separate backend (covsight.core.xml) with its own
+          format plugin. Conversion runs through the UCIS object API, so the
+          Parquet mapping neither reads nor writes XML.
+
+  - id: L1.6
+    title: "`ucis_OpenReadStream(name)` — read-streaming open"
+    spec_ref: "§ 8.1.9"
+    kind: feature
+    backends:
+      parquet:
+        scope: out_of_scope
+        reason: >
+          Read-streaming serves objects in document order without random access.
+          The access mapping is the opposite by construction -- ranged bulk
+          prefetch over dfs_ordinal, fed into a cursor.
+
+  - id: L1.7
+    title: "`ucis_OpenWriteStream(name)` — write-streaming open"
+    spec_ref: "§ 8.1.10"
+    kind: feature
+    backends:
+      parquet:
+        scope: out_of_scope
+        reason: >
+          The write path is a batch loader by design (see 'Read/write scope' in
+          the mapping document): objects are buffered into columnar batches,
+          never emitted row-by-row. Write-streaming flush semantics have no
+          counterpart.
+
+  - id: L1.8
+    title: "`ucis_WriteStream(db)` — flush in-flight object in write-streaming"
+    spec_ref: "§ 8.1.11"
+    kind: feature
+    backends:
+      parquet:
+        scope: out_of_scope
+        reason: >
+          The write path is a batch loader by design (see 'Read/write scope' in
+          the mapping document): objects are buffered into columnar batches,
+          never emitted row-by-row. Write-streaming flush semantics have no
+          counterpart.
+
+  - id: L1.9
+    title: "`ucis_WriteStreamScope(db)` — flush current scope and pop to parent"
+    spec_ref: "§ 8.1.12"
+    kind: feature
+    backends:
+      parquet:
+        scope: out_of_scope
+        reason: >
+          The write path is a batch loader by design (see 'Read/write scope' in
+          the mapping document): objects are buffered into columnar batches,
+          never emitted row-by-row. Write-streaming flush semantics have no
+          counterpart.
+
+  - id: L1.10
+    title: "`ucis_GetPathSeparator(db)` / `ucis_SetPathSeparator(db, sep)`"
+    spec_ref: "§ 8.1.7–8"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Database-level state that determines how hierarchical names -- and
+      therefore unique_id, the primary key -- are composed.

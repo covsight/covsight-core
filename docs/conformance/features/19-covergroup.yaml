@@ -1,0 +1,130 @@
+# UCIS conformance registry -- section 19: Covergroup coverage
+#
+# GENERATED SKELETON, HAND-MAINTAINED THEREAFTER.
+# Records intent only: what the backend is expected to do with each feature.
+# Status ("is it tested?", "is it documented?") is computed by
+# tools/gen_conformance_matrix.py and never written here.
+#
+# See docs/conformance/README.md.
+
+section:
+  number: 19
+  title: "Covergroup coverage"
+  spec_ref: "§ 6.4, § 9.8"
+
+features:
+  - id: CG.1
+    title: "`UCIS_COVERGROUP` type scope"
+    spec_ref: "§ 6.4.2"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+
+  - id: CG.2
+    title: "`UCIS_COVERINSTANCE` per-instance specialization"
+    spec_ref: "§ 6.4.2"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+
+  - id: CG.3
+    title: "`UCIS_COVERPOINT` scope with `UCIS_CVGBIN` children"
+    spec_ref: "§ 6.4.2"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+
+  - id: CG.4
+    title: "`UCIS_CROSS` scope referencing N coverpoints (built via `CreateCross`)"
+    spec_ref: "§ 6.4.2"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+
+  - id: CG.5
+    title: "Bin-scope variants: `UCIS_CVGBINSCOPE`, `UCIS_ILLEGALBINSCOPE`, `UCIS_IGNOREBINSCOPE`"
+    spec_ref: "§ 6.4.2"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+
+  - id: CG.6
+    title: "Per-bin classification: `UCIS_IGNOREBIN`, `UCIS_ILLEGALBIN`, `UCIS_DEFAULTBIN`"
+    spec_ref: "§ 6.4.2"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+
+  - id: CG.7
+    title: "Transition bins via `UCIS_TRANSITION` scope + `UCIS_SCOPE_CVG_TRANSITION` flag"
+    spec_ref: "§ 6.4.2"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+
+  - id: CG.8
+    title: "Coverpoint shape flags: `UCIS_SCOPE_CVG_AUTO/SCALAR/VECTOR/TRANSITION`"
+    spec_ref: "§ 6.4.2"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+
+  - id: CG.9
+    title: "Covergroup options: `UCIS_INT_CVG_ATLEAST`, `AUTOBINMAX`, `DETECTOVERLAP`, `NUMPRINTMISSING`, `STROBE`, `PERINSTANCE`, `GETINSTCOV`, `MERGEINSTANCES`"
+    spec_ref: "§ 6.4.2"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+
+  - id: CG.10
+    title: "`UCIS_REAL_CVG_INST_AVERAGE`"
+    spec_ref: "§ 6.4.2"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+
+  - id: CG.11
+    title: "Cross helpers: `UCIS_INT_NUM_CROSSED_CVPS`, `UCIS_STR_ITH_CROSSED_CVP_NAME`, `ucis_GetIthCrossedCvp`"
+    spec_ref: "§ 8.5.18"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+
+  - id: CG.12
+    title: "`UCIS_IS_CROSSAUTO` per-bin flag (auto-generated cross bin)"
+    spec_ref: "§ 6.4.2"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+
+  - id: CG.13
+    title: "Bin guards: `UCIS_BIN_IFF_EXISTS`, `UCIS_BIN_SAMPLE_TRUE`"
+    spec_ref: "§ 6.4.2"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+
+  - id: CG.14
+    title: "XML schema: `CGINSTANCE`, `CG_ID`, `CGINST_OPTIONS`, `COVERPOINT`, `COVERPOINT_OPTIONS`, `COVERPOINT_BIN`, `RANGE_VALUE`, `SEQUENCE`, `CROSS`, `CROSS_OPTIONS`, `CROSS_BIN`"
+    spec_ref: "§ 9.8"
+    kind: feature
+    backends:
+      parquet:
+        scope: out_of_scope
+        reason: >
+          XML interchange is a separate backend (covsight.core.xml) with its own
+          format plugin. Conversion runs through the UCIS object API, so the
+          Parquet mapping neither reads nor writes XML.

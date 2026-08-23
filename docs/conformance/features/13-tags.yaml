@@ -1,0 +1,89 @@
+# UCIS conformance registry -- section 13: Tags
+#
+# GENERATED SKELETON, HAND-MAINTAINED THEREAFTER.
+# Records intent only: what the backend is expected to do with each feature.
+# Status ("is it tested?", "is it documented?") is computed by
+# tools/gen_conformance_matrix.py and never written here.
+#
+# See docs/conformance/README.md.
+
+section:
+  number: 13
+  title: "Tags"
+  spec_ref: "§ 3.4.4, § 8.16"
+
+features:
+  - id: T13.1
+    title: "`ucis_ObjKind(db, obj)`"
+    spec_ref: "§ 8.16.1"
+    kind: feature
+    backends:
+      parquet:
+        scope: extended
+        reason: >
+          Tags are an organizational overlay on coverage data, not coverage
+          data. Dropping them loses grouping, never a count.
+    notes: >
+      Tags are user data and must survive a round trip. The mapping document
+      does not yet say where they live -- that gap is the point of scoring
+      them.
+
+  - id: T13.2
+    title: "`ucis_AddObjTag(db, obj, tagname)`"
+    spec_ref: "§ 8.16.2"
+    kind: feature
+    backends:
+      parquet:
+        scope: extended
+        reason: >
+          Tags are an organizational overlay on coverage data, not coverage
+          data. Dropping them loses grouping, never a count.
+    notes: >
+      Tags are user data and must survive a round trip. The mapping document
+      does not yet say where they live -- that gap is the point of scoring
+      them.
+
+  - id: T13.3
+    title: "`ucis_RemoveObjTag(db, obj, tagname)`"
+    spec_ref: "§ 8.16.3"
+    kind: feature
+    backends:
+      parquet:
+        scope: extended
+        reason: >
+          Tags are an organizational overlay on coverage data, not coverage
+          data. Dropping them loses grouping, never a count.
+    notes: >
+      Tags are user data and must survive a round trip. The mapping document
+      does not yet say where they live -- that gap is the point of scoring
+      them.
+
+  - id: T13.4
+    title: "Tag traversal (see IT.8, IT.9)"
+    spec_ref: "§ 8.9, 8.10"
+    kind: feature
+    backends:
+      parquet:
+        scope: extended
+        reason: >
+          Tags are an organizational overlay on coverage data, not coverage
+          data. Dropping them loses grouping, never a count.
+    notes: >
+      Tags are user data and must survive a round trip. The mapping document
+      does not yet say where they live -- that gap is the point of scoring
+      them.
+
+  - id: T13.5
+    title: "`UCIS_GROUP` scope as tag-group container"
+    spec_ref: "§ 6"
+    kind: feature
+    backends:
+      parquet:
+        scope: extended
+        reason: >
+          Tags are an organizational overlay on coverage data, not coverage
+          data. Dropping them loses grouping, never a count.
+    notes: >
+      Tags are user data and must survive a round trip. The mapping document
+      does not yet say where they live -- that gap is the point of scoring
+      them.

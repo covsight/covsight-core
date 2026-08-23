@@ -1,0 +1,8 @@
+# Same build (OpenTitan, already compiled), different workloads → identical
+# coverage STRUCTURE but different hit COUNTS. Stresses counts.bin and validates
+# the toggle hit-bitmap / sparse-counts levers (ncdb-improvements.md #2, #5).
+OpenTitan:default:hello
+OpenTitan:default:cmark
+OpenTitan:default:sha
+OpenTitan:default:rsa
+OpenTitan:default:aes

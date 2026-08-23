@@ -1,0 +1,4 @@
+obj_dir/
+coverage.dat
+coverage.cdb
+rtlmeter-out/

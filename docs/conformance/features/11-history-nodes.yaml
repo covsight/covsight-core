@@ -1,0 +1,107 @@
+# UCIS conformance registry -- section 11: History nodes and test data
+#
+# GENERATED SKELETON, HAND-MAINTAINED THEREAFTER.
+# Records intent only: what the backend is expected to do with each feature.
+# Status ("is it tested?", "is it documented?") is computed by
+# tools/gen_conformance_matrix.py and never written here.
+#
+# See docs/conformance/README.md.
+
+section:
+  number: 11
+  title: "History nodes and test data"
+  spec_ref: "§ 4.3, § 8.13, § 8.14"
+
+features:
+  - id: H11.1
+    title: "`ucis_CreateHistoryNode(db, parent, logicalname, physicalname, kind)`"
+    spec_ref: "§ 8.13.1"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+
+  - id: H11.2
+    title: "`ucis_RemoveHistoryNode(db, node)`"
+    spec_ref: "§ 8.13.2"
+    kind: feature
+    backends:
+      parquet:
+        scope: deferred
+        reason: >
+          In-place removal from an append-only columnar dataset. The write path
+          is a batch loader and has no delete; removal would be expressed as
+          rewriting the definition tables, which is a separate feature from the
+          UCIS call.
+        adr: docs/adr/0003-parquet-backend.md
+
+  - id: H11.3
+    title: "`ucis_GetHistoryKind(db, node)`"
+    spec_ref: "§ 8.13.3"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      history_nodes plus the run-partitioned history_props long tail.
+
+  - id: H11.4
+    title: "`ucis_SetTestData(db, node, &data)` / `ucis_GetTestData`"
+    spec_ref: "§ 8.14.2–3"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      history_nodes plus the run-partitioned history_props long tail.
+
+  - id: H11.5
+    title: "History-node kinds: `UCIS_HISTORYNODE_NONE`, `_ALL`, `_TEST`, `_MERGE`"
+    spec_ref: "§ 4.3.1"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      history_nodes plus the run-partitioned history_props long tail.
+
+  - id: H11.6
+    title: "Tool-category strings: `UCIS_SIM_TOOL`, `UCIS_FORMAL_TOOL`, `UCIS_ANALOG_TOOL`, `UCIS_EMULATOR_TOOL`, `UCIS_MERGE_TOOL`"
+    spec_ref: "§ 4.3"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      history_nodes plus the run-partitioned history_props long tail.
+
+  - id: H11.7
+    title: "Test-status enum: `OK`, `WARNING`, `ERROR`, `FATAL`, `MISSING`, `MERGE_ERROR`"
+    spec_ref: "§ 8.14.1"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      history_nodes plus the run-partitioned history_props long tail.
+
+  - id: H11.8
+    title: "Test-data record fields: `teststatus`, `simtime`, `timeunit`, `runcwd`, `cputime`, `seed`, `cmd`, `args`, `compulsory`, `date`, `username`, `cost`, `toolcategory`"
+    spec_ref: "§ 8.14"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      history_nodes plus the run-partitioned history_props long tail.
+
+  - id: H11.9
+    title: "Universal-Object-Recognition compliance flags (UOR safe scopes/coveritems)"
+    spec_ref: "§ 4.3.2, § 6.1.1"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Carried as the UOR scope flags SF.14/SF.15. Listed separately because
+      the compliance claim is about merge safety, not about the bits.

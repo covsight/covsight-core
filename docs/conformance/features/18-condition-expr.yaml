@@ -1,0 +1,50 @@
+# UCIS conformance registry -- section 18: Condition and expression coverage
+#
+# GENERATED SKELETON, HAND-MAINTAINED THEREAFTER.
+# Records intent only: what the backend is expected to do with each feature.
+# Status ("is it tested?", "is it documented?") is computed by
+# tools/gen_conformance_matrix.py and never written here.
+#
+# See docs/conformance/README.md.
+
+section:
+  number: 18
+  title: "Condition and expression coverage"
+  spec_ref: "§ 6.5.4, § 9.9"
+
+features:
+  - id: CX.1
+    title: "`UCIS_EXPR` / `UCIS_COND` scope with `UCIS_EXPRBIN` / `UCIS_CONDBIN` children (truth-table rows)"
+    spec_ref: "§ 6.5.4"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+
+  - id: CX.2
+    title: "`UCIS_INT_SCOPE_NUM_EXPR_TERMS` + `UCIS_STR_EXPR_TERMS`"
+    spec_ref: "§ 6.5.4"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+
+  - id: CX.3
+    title: "`UCIS_SCOPE_EXPR_ISHIERARCHICAL` flag"
+    spec_ref: "§ 6.5.4"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+
+  - id: CX.4
+    title: "XML schema: `EXPR`"
+    spec_ref: "§ 9.9"
+    kind: feature
+    backends:
+      parquet:
+        scope: out_of_scope
+        reason: >
+          XML interchange is a separate backend (covsight.core.xml) with its own
+          format plugin. Conversion runs through the UCIS object API, so the
+          Parquet mapping neither reads nor writes XML.

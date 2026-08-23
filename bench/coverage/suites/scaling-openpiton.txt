@@ -1,0 +1,8 @@
+# Replicated-tile scaling sweep (1 → 1024 cores). Charts NCDB size vs design
+# size and stresses structural dedup (identical tiles repeated N times).
+OpenPiton:1x1:hello
+OpenPiton:2x2:hello
+OpenPiton:4x4:hello
+OpenPiton:8x8:hello
+OpenPiton:16x16:hello
+OpenPiton:32x32:hello

@@ -1,0 +1,148 @@
+# UCIS conformance registry -- section 5: Source language enum
+#
+# HAND-AUTHORED (T21). Records intent only: what the backend is expected to do
+# with each feature. Status ("is it tested?", "is it documented?") is computed
+# by tools/gen_conformance_matrix.py and never written here.
+#
+# See docs/conformance/README.md.
+
+section:
+  number: 5
+  title: "Source language enum"
+  spec_ref: "§ 5, § 8.5"
+  notes: >
+    ucisSourceT. The enumerators are consecutive from UCIS_VHDL = 0; the
+    numbering is part of the interchange, so the whole enum is one key space
+    rather than one entry.
+
+features:
+
+  - id: SL.1
+    title: "`UCIS_VHDL` — VHDL"
+    spec_ref: "§ 5"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Value 0 of ucisSourceT. Carried in scopes.source (see PI.6).
+
+  - id: SL.2
+    title: "`UCIS_VLOG` — Verilog"
+    spec_ref: "§ 5"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Value 1 of ucisSourceT. Carried in scopes.source (see PI.6).
+
+  - id: SL.3
+    title: "`UCIS_SV` — SystemVerilog"
+    spec_ref: "§ 5"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Value 2 of ucisSourceT. Carried in scopes.source (see PI.6).
+
+  - id: SL.4
+    title: "`UCIS_SYSTEMC` — SystemC"
+    spec_ref: "§ 5"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Value 3 of ucisSourceT. Carried in scopes.source (see PI.6).
+
+  - id: SL.5
+    title: "`UCIS_PSL_VHDL` — assert/cover in PSL VHDL"
+    spec_ref: "§ 5"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Value 4 of ucisSourceT. Carried in scopes.source (see PI.6).
+
+  - id: SL.6
+    title: "`UCIS_PSL_VLOG` — assert/cover in PSL Verilog"
+    spec_ref: "§ 5"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Value 5 of ucisSourceT. Carried in scopes.source (see PI.6).
+
+  - id: SL.7
+    title: "`UCIS_PSL_SV` — assert/cover in PSL SystemVerilog"
+    spec_ref: "§ 5"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Value 6 of ucisSourceT. Carried in scopes.source (see PI.6).
+
+  - id: SL.8
+    title: "`UCIS_PSL_SYSTEMC` — assert/cover in PSL SystemC"
+    spec_ref: "§ 5"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Value 7 of ucisSourceT. Carried in scopes.source (see PI.6).
+
+  - id: SL.9
+    title: "`UCIS_E` — e"
+    spec_ref: "§ 5"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Value 8 of ucisSourceT. Carried in scopes.source (see PI.6).
+
+  - id: SL.10
+    title: "`UCIS_VERA` — Vera"
+    spec_ref: "§ 5"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Value 9 of ucisSourceT. Carried in scopes.source (see PI.6).
+
+  - id: SL.11
+    title: "`UCIS_NONE` — not important / unspecified"
+    spec_ref: "§ 5"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Value 10 of ucisSourceT. Carried in scopes.source (see PI.6).
+
+  - id: SL.12
+    title: "`UCIS_OTHER` — user-defined; also used for user-defined attributes"
+    spec_ref: "§ 5"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Value 11 of ucisSourceT. Carried in scopes.source (see PI.6).
+
+  - id: SL.13
+    title: "`UCIS_SOURCE_ERROR` — error cases"
+    spec_ref: "§ 5"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Value 12 of ucisSourceT. Carried in scopes.source (see PI.6).

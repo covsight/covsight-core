@@ -10,4 +10,6 @@ from covsight.core.api.enums.str_property import StrProperty
 from covsight.core.api.enums.real_property import RealProperty
 from covsight.core.api.enums.handle_property import HandleProperty
 from covsight.core.api.enums.test_status import TestStatusT
-from covsight.core.api.enums.formal_status import FormalStatusT
+from covsight.core.api.enums.formal_status import (
+    FormalStatusT, merge_formal_statuses, formal_status_rank,
+)

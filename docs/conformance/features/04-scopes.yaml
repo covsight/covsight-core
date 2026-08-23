@@ -1,0 +1,892 @@
+# UCIS conformance registry -- section 4: Scope creation and management
+#
+# GENERATED SKELETON, HAND-MAINTAINED THEREAFTER.
+# Records intent only: what the backend is expected to do with each feature.
+# Status ("is it tested?", "is it documented?") is computed by
+# tools/gen_conformance_matrix.py and never written here.
+#
+# See docs/conformance/README.md.
+
+section:
+  number: 4
+  title: "Scope creation and management"
+  spec_ref: "§ 8.5"
+
+features:
+  - id: S4.1
+    title: "`ucis_CreateScope(db, parent, name, srcinfo, weight, source, type, flags)`"
+    spec_ref: "§ 8.5.2"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+
+  - id: S4.2
+    title: "`ucis_CreateInstance(db, parent, name, srcinfo, weight, source, type, du, flags)` — DU-linked instance"
+    spec_ref: "§ 8.5.9"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+
+  - id: S4.3
+    title: "`ucis_CreateInstanceByName(...du_name, flags)` — write-streaming variant by name"
+    spec_ref: "§ 8.5.10"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      The by-name form is a write-streaming call, but its data effect -- an
+      instance linked to its DU by name -- is exactly what
+      scopes.instance_du_id records, resolved after the walk because a DU may
+      serialize after an instance of it.
+
+  - id: S4.4
+    title: "`ucis_CreateCross(db, parent, name, srcinfo, weight, source, n, points[])`"
+    spec_ref: "§ 8.5.7"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+
+  - id: S4.5
+    title: "`ucis_CreateCrossByName(...n, point_names[])` — write-streaming variant"
+    spec_ref: "§ 8.5.8"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      As S4.3: the streaming call is out of scope, the name-based cross
+      reference it produces is not.
+
+  - id: S4.6
+    title: "`ucis_CreateNextTransition(db, parent, name, srcinfo, weight, src_state, dst_state)` — FSM arc"
+    spec_ref: "§ 8.5.11"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+
+  - id: S4.7
+    title: "`ucis_RemoveScope(db, scope)`"
+    spec_ref: "§ 8.5.3"
+    kind: feature
+    backends:
+      parquet:
+        scope: deferred
+        reason: >
+          In-place removal from an append-only columnar dataset. The write path
+          is a batch loader and has no delete; removal would be expressed as
+          rewriting the definition tables, which is a separate feature from the
+          UCIS call.
+        adr: docs/adr/0003-parquet-backend.md
+
+  - id: S4.8
+    title: "`ucis_ComposeDUName(lib, primary, secondary)` → string"
+    spec_ref: "§ 8.5.5"
+    kind: feature
+    backends:
+      parquet:
+        scope: out_of_scope
+        reason: >
+          A pure string helper over the DU naming convention. It touches no
+          database state.
+
+  - id: S4.9
+    title: "`ucis_ParseDUName(name, &lib, &primary, &secondary)`"
+    spec_ref: "§ 8.5.6"
+    kind: feature
+    backends:
+      parquet:
+        scope: out_of_scope
+        reason: >
+          A pure string helper over the DU naming convention. It touches no
+          database state.
+
+  - id: S4.10
+    title: "`ucis_MatchDU(db, name)` → DU scope"
+    spec_ref: "§ 8.5.17"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Lookup by identity is the operation unique_id exists to serve; it is how
+      a tool re-opens a handle after a round trip or a backend swap.
+
+  - id: S4.11
+    title: "`ucis_MatchScopeByUniqueID(db, uid_list)` — case-insensitive"
+    spec_ref: "§ 8.5.13"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Lookup by identity is the operation unique_id exists to serve; it is how
+      a tool re-opens a handle after a round trip or a backend swap.
+
+  - id: S4.12
+    title: "`ucis_CaseAwareMatchScopeByUniqueID(db, uid_list)`"
+    spec_ref: "§ 8.5.14"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Lookup by identity is the operation unique_id exists to serve; it is how
+      a tool re-opens a handle after a round trip or a backend swap.
+
+  - id: S4.13
+    title: "`ucis_MatchCoverByUniqueID(db, uid_list)`"
+    spec_ref: "§ 8.5.15"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Lookup by identity is the operation unique_id exists to serve; it is how
+      a tool re-opens a handle after a round trip or a backend swap.
+
+  - id: S4.14
+    title: "`ucis_CaseAwareMatchCoverByUniqueID(db, uid_list)`"
+    spec_ref: "§ 8.5.16"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Lookup by identity is the operation unique_id exists to serve; it is how
+      a tool re-opens a handle after a round trip or a backend swap.
+
+  - id: S4.15
+    title: "`UCIS_STR_UNIQUE_ID` / `UCIS_STR_UNIQUE_ID_ALIAS` string properties (computation per § 5.4)"
+    spec_ref: "§ 5.4"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+
+  - id: S4.16
+    title: "`ucis_SetScopeSourceInfo` / `ucis_GetScopeSourceInfo`"
+    spec_ref: "§ 8.5.19, 8.5.24"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+
+  - id: S4.17
+    title: "`ucis_GetScopeType(db, scope)` → `ucisScopeTypeT`"
+    spec_ref: "§ 8.5.25"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+
+  - id: S4.18
+    title: "`ucis_GetObjType(db, obj)` → scope or history-node kind"
+    spec_ref: "§ 8.5.26"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+
+  - id: S4.19
+    title: "`ucis_GetIthCrossedCvp(db, cross, i)` → coverpoint scope"
+    spec_ref: "§ 8.5.18"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+
+  - id: S4.20
+    title: "`ucis_CallBack(db, scope, mask, kind, fn, userdata)` — scope-callback walk"
+    spec_ref: "§ 8.5.4"
+    kind: feature
+    backends:
+      parquet:
+        scope: out_of_scope
+        reason: >
+          A callback-driven traversal idiom over an in-memory tree. The access
+          mapping presents cursors over batched reads; the data it would walk is
+          already covered by IT.1-IT.5.
+
+  - id: ST.1
+    title: "`UCIS_TOGGLE`"
+    spec_ref: "§ 6.5.5"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      scopes.scope_type carries the UCIS enum verbatim (INT64, because
+      ScopeTypeT exceeds 32 bits).
+
+  - id: ST.2
+    title: "`UCIS_BRANCH`"
+    spec_ref: "§ 6.5.2"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      scopes.scope_type carries the UCIS enum verbatim (INT64, because
+      ScopeTypeT exceeds 32 bits).
+
+  - id: ST.3
+    title: "`UCIS_EXPR`"
+    spec_ref: "§ 6.5.4"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      scopes.scope_type carries the UCIS enum verbatim (INT64, because
+      ScopeTypeT exceeds 32 bits).
+
+  - id: ST.4
+    title: "`UCIS_COND`"
+    spec_ref: "§ 6.5.4"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      scopes.scope_type carries the UCIS enum verbatim (INT64, because
+      ScopeTypeT exceeds 32 bits).
+
+  - id: ST.5
+    title: "`UCIS_INSTANCE`"
+    spec_ref: "§ 6.3 — HDL instance scope, requires DU link"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      scopes.scope_type carries the UCIS enum verbatim (INT64, because
+      ScopeTypeT exceeds 32 bits).
+
+  - id: ST.6
+    title: "`UCIS_PROCESS`"
+    spec_ref: "§ 6.3.5"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      scopes.scope_type carries the UCIS enum verbatim (INT64, because
+      ScopeTypeT exceeds 32 bits).
+
+  - id: ST.7
+    title: "`UCIS_BLOCK`"
+    spec_ref: "§ 6.5.3 — statement/block coverage container"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      scopes.scope_type carries the UCIS enum verbatim (INT64, because
+      ScopeTypeT exceeds 32 bits).
+
+  - id: ST.8
+    title: "`UCIS_FUNCTION`"
+    spec_ref: "§ 6.3.5"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      scopes.scope_type carries the UCIS enum verbatim (INT64, because
+      ScopeTypeT exceeds 32 bits).
+
+  - id: ST.9
+    title: "`UCIS_FORKJOIN`"
+    spec_ref: "§ 6.3.5"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      scopes.scope_type carries the UCIS enum verbatim (INT64, because
+      ScopeTypeT exceeds 32 bits).
+
+  - id: ST.10
+    title: "`UCIS_GENERATE`"
+    spec_ref: "§ 6.3.5"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      scopes.scope_type carries the UCIS enum verbatim (INT64, because
+      ScopeTypeT exceeds 32 bits).
+
+  - id: ST.11
+    title: "`UCIS_GENERIC`"
+    spec_ref: "§ 6.3.5"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      scopes.scope_type carries the UCIS enum verbatim (INT64, because
+      ScopeTypeT exceeds 32 bits).
+
+  - id: ST.12
+    title: "`UCIS_CLASS`"
+    spec_ref: "§ 6.3.5"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      scopes.scope_type carries the UCIS enum verbatim (INT64, because
+      ScopeTypeT exceeds 32 bits).
+
+  - id: ST.13
+    title: "`UCIS_COVERGROUP`"
+    spec_ref: "§ 6.4.2 — covergroup type"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      scopes.scope_type carries the UCIS enum verbatim (INT64, because
+      ScopeTypeT exceeds 32 bits).
+
+  - id: ST.14
+    title: "`UCIS_COVERINSTANCE`"
+    spec_ref: "§ 6.4.2 — per-instance specialization of a covergroup"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      scopes.scope_type carries the UCIS enum verbatim (INT64, because
+      ScopeTypeT exceeds 32 bits).
+
+  - id: ST.15
+    title: "`UCIS_COVERPOINT`"
+    spec_ref: "§ 6.4.2"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      scopes.scope_type carries the UCIS enum verbatim (INT64, because
+      ScopeTypeT exceeds 32 bits).
+
+  - id: ST.16
+    title: "`UCIS_CROSS`"
+    spec_ref: "§ 6.4.2"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      scopes.scope_type carries the UCIS enum verbatim (INT64, because
+      ScopeTypeT exceeds 32 bits).
+
+  - id: ST.17
+    title: "`UCIS_COVER`"
+    spec_ref: "§ 6.6.1 — SVA/PSL cover-property container"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      scopes.scope_type carries the UCIS enum verbatim (INT64, because
+      ScopeTypeT exceeds 32 bits).
+
+  - id: ST.18
+    title: "`UCIS_ASSERT`"
+    spec_ref: "§ 6.6.2 — SVA/PSL assert container"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      scopes.scope_type carries the UCIS enum verbatim (INT64, because
+      ScopeTypeT exceeds 32 bits).
+
+  - id: ST.19
+    title: "`UCIS_PROGRAM`"
+    spec_ref: "§ 6.3.5"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      scopes.scope_type carries the UCIS enum verbatim (INT64, because
+      ScopeTypeT exceeds 32 bits).
+
+  - id: ST.20
+    title: "`UCIS_PACKAGE`"
+    spec_ref: "§ 6.3.5"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      scopes.scope_type carries the UCIS enum verbatim (INT64, because
+      ScopeTypeT exceeds 32 bits).
+
+  - id: ST.21
+    title: "`UCIS_TASK`"
+    spec_ref: "§ 6.3.5"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      scopes.scope_type carries the UCIS enum verbatim (INT64, because
+      ScopeTypeT exceeds 32 bits).
+
+  - id: ST.22
+    title: "`UCIS_INTERFACE`"
+    spec_ref: "§ 6.3.5"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      scopes.scope_type carries the UCIS enum verbatim (INT64, because
+      ScopeTypeT exceeds 32 bits).
+
+  - id: ST.23
+    title: "`UCIS_FSM`"
+    spec_ref: "§ 6.5.6"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      scopes.scope_type carries the UCIS enum verbatim (INT64, because
+      ScopeTypeT exceeds 32 bits).
+
+  - id: ST.24
+    title: "`UCIS_TESTPLAN`"
+    kind: feature
+    backends:
+      parquet:
+        scope: out_of_scope
+        reason: >
+          UCIS 1.0 defines no UCIS_TESTPLAN scope type; the catalog row was an
+          error. Testplan linkage is a covsight concept with its own schema
+          (docs/testplan-schema.md), not a UCIS scope.
+    notes: >
+      Testplan-link surface scopes.scope_type carries the UCIS enum verbatim
+      (INT64, because ScopeTypeT exceeds 32 bits).
+
+  - id: ST.25
+    title: "`UCIS_DU_MODULE`"
+    spec_ref: "§ 6.3.3 — Verilog/SV module DU"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      scopes.scope_type carries the UCIS enum verbatim (INT64, because
+      ScopeTypeT exceeds 32 bits).
+
+  - id: ST.26
+    title: "`UCIS_DU_ARCH`"
+    spec_ref: "§ 6.3.3 — VHDL architecture"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      scopes.scope_type carries the UCIS enum verbatim (INT64, because
+      ScopeTypeT exceeds 32 bits).
+
+  - id: ST.27
+    title: "`UCIS_DU_PACKAGE`"
+    spec_ref: "§ 6.3.3"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      scopes.scope_type carries the UCIS enum verbatim (INT64, because
+      ScopeTypeT exceeds 32 bits).
+
+  - id: ST.28
+    title: "`UCIS_DU_PROGRAM`"
+    spec_ref: "§ 6.3.3"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      scopes.scope_type carries the UCIS enum verbatim (INT64, because
+      ScopeTypeT exceeds 32 bits).
+
+  - id: ST.29
+    title: "`UCIS_DU_INTERFACE`"
+    spec_ref: "§ 6.3.3"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      scopes.scope_type carries the UCIS enum verbatim (INT64, because
+      ScopeTypeT exceeds 32 bits).
+
+  - id: ST.30
+    title: "`UCIS_FSM_STATES`"
+    spec_ref: "§ 6.5.6 — child of FSM holding STATEBINs"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      scopes.scope_type carries the UCIS enum verbatim (INT64, because
+      ScopeTypeT exceeds 32 bits).
+
+  - id: ST.31
+    title: "`UCIS_FSM_TRANS`"
+    spec_ref: "§ 6.5.6 — child of FSM holding TRANSBINs"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      scopes.scope_type carries the UCIS enum verbatim (INT64, because
+      ScopeTypeT exceeds 32 bits).
+
+  - id: ST.32
+    title: "`UCIS_COVBLOCK`"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Block sub-bucket for cover statements scopes.scope_type carries the UCIS
+      enum verbatim (INT64, because ScopeTypeT exceeds 32 bits).
+
+  - id: ST.33
+    title: "`UCIS_CVGBINSCOPE`"
+    spec_ref: "§ 6.4.2 — coverpoint bin scope"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      scopes.scope_type carries the UCIS enum verbatim (INT64, because
+      ScopeTypeT exceeds 32 bits).
+
+  - id: ST.34
+    title: "`UCIS_ILLEGALBINSCOPE`"
+    spec_ref: "§ 6.4.2 — coverpoint illegal-bin scope"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      scopes.scope_type carries the UCIS enum verbatim (INT64, because
+      ScopeTypeT exceeds 32 bits).
+
+  - id: ST.35
+    title: "`UCIS_IGNOREBINSCOPE`"
+    spec_ref: "§ 6.4.2 — coverpoint ignore-bin scope"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      scopes.scope_type carries the UCIS enum verbatim (INT64, because
+      ScopeTypeT exceeds 32 bits).
+
+  - id: ST.36
+    title: "`UCIS_BBLOCKSCOPE`"
+    kind: feature
+    backends:
+      parquet:
+        scope: out_of_scope
+        reason: >
+          UCIS 1.0 defines no UCIS_BBLOCKSCOPE. The spec's basic-block scope is
+          UCIS_BBLOCK, which is the same value ST.32 already records as
+          UCIS_COVBLOCK, so this entry is a duplicate under a wrong name.
+    notes: >
+      basic-block scope (§ 4.8.2) scopes.scope_type carries the UCIS enum
+      verbatim (INT64, because ScopeTypeT exceeds 32 bits).
+
+  - id: ST.37
+    title: "`UCIS_GROUP`"
+    kind: feature
+    backends:
+      parquet:
+        scope: out_of_scope
+        reason: >
+          UCIS 1.0 defines no UCIS_GROUP scope type; tags attach to objects
+          directly (§ 8.16) rather than through a container scope.
+    notes: >
+      Tag-group container scopes.scope_type carries the UCIS enum verbatim
+      (INT64, because ScopeTypeT exceeds 32 bits).
+
+  - id: ST.38
+    title: "`UCIS_TRANSITION`"
+    kind: feature
+    backends:
+      parquet:
+        scope: out_of_scope
+        reason: >
+          UCIS 1.0 defines no UCIS_TRANSITION scope type. Transition bins hang
+          off the coverpoint, which carries UCIS_SCOPE_CVG_TRANSITION.
+    notes: >
+      Transition-coverpoint child scopes.scope_type carries the UCIS enum
+      verbatim (INT64, because ScopeTypeT exceeds 32 bits).
+
+  - id: ST.39
+    title: "`UCIS_RESERVEDSCOPE`"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Vendor-reserved high byte scopes.scope_type carries the UCIS enum
+      verbatim (INT64, because ScopeTypeT exceeds 32 bits).
+
+  - id: SF.1
+    title: "`UCIS_INST_ONCE`"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Instance contents emitted once; cross-link other instances scopes.flags
+      carries the bitfield verbatim.
+
+  - id: SF.2
+    title: "`UCIS_ENABLED_STMT`"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Statement coverage enabled scopes.flags carries the bitfield verbatim.
+
+  - id: SF.3
+    title: "`UCIS_ENABLED_BRANCH`"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Branch coverage enabled scopes.flags carries the bitfield verbatim.
+
+  - id: SF.4
+    title: "`UCIS_ENABLED_COND`"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Condition coverage enabled scopes.flags carries the bitfield verbatim.
+
+  - id: SF.5
+    title: "`UCIS_ENABLED_EXPR`"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Expression coverage enabled scopes.flags carries the bitfield verbatim.
+
+  - id: SF.6
+    title: "`UCIS_ENABLED_FSM`"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      FSM coverage enabled scopes.flags carries the bitfield verbatim.
+
+  - id: SF.7
+    title: "`UCIS_ENABLED_TOGGLE`"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Toggle coverage enabled scopes.flags carries the bitfield verbatim.
+
+  - id: SF.8
+    title: "`UCIS_ENABLED_BLOCK`"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Block coverage enabled scopes.flags carries the bitfield verbatim.
+
+  - id: SF.9
+    title: "`UCIS_SCOPE_UNDER_DU`"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Scope is the direct child of a DU scopes.flags carries the bitfield
+      verbatim.
+
+  - id: SF.10
+    title: "`UCIS_SCOPE_EXCLUDED`"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Excluded scopes.flags carries the bitfield verbatim.
+
+  - id: SF.11
+    title: "`UCIS_SCOPE_PRAGMA_EXCLUDED`"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Excluded by source-pragma scopes.flags carries the bitfield verbatim.
+
+  - id: SF.12
+    title: "`UCIS_SCOPE_PRAGMA_CLEARED`"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Pragma-cleared scopes.flags carries the bitfield verbatim.
+
+  - id: SF.13
+    title: "`UCIS_SCOPE_SPECIALIZED`"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Specialization of a generic covergroup/class scopes.flags carries the
+      bitfield verbatim.
+
+  - id: SF.14
+    title: "`UCIS_UOR_SAFE_SCOPE`"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Universal-Object-Recognition safe (§ 6.1.1) scopes.flags carries the
+      bitfield verbatim.
+
+  - id: SF.15
+    title: "`UCIS_UOR_SAFE_SCOPE_ALLCOVERS`"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      All children also UOR-safe scopes.flags carries the bitfield verbatim.
+
+  - id: SF.16
+    title: "`UCIS_IS_TOP_NODE`"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Top-level node of the hierarchy scopes.flags carries the bitfield
+      verbatim.
+
+  - id: SF.17
+    title: "`UCIS_IS_IMMEDIATE_ASSERT`"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Immediate-assertion semantics scopes.flags carries the bitfield
+      verbatim.
+
+  - id: SF.18
+    title: "`UCIS_SCOPE_CVG_AUTO`"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Auto-bin covergroup scopes.flags carries the bitfield verbatim.
+
+  - id: SF.19
+    title: "`UCIS_SCOPE_CVG_SCALAR`"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Scalar coverpoint scopes.flags carries the bitfield verbatim.
+
+  - id: SF.20
+    title: "`UCIS_SCOPE_CVG_VECTOR`"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Vector coverpoint scopes.flags carries the bitfield verbatim.
+
+  - id: SF.21
+    title: "`UCIS_SCOPE_CVG_TRANSITION`"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Transition coverpoint scopes.flags carries the bitfield verbatim.
+
+  - id: SF.22
+    title: "`UCIS_SCOPE_IFF_EXISTS`"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Coverpoint has `iff` guard scopes.flags carries the bitfield verbatim.
+
+  - id: SF.23
+    title: "`UCIS_SCOPE_SAMPLE_TRUE`"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Coverpoint sampled on true scopes.flags carries the bitfield verbatim.
+
+  - id: SF.24
+    title: "`UCIS_SCOPE_BLOCK_ISBRANCH`"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Block is the implicit-branch container scopes.flags carries the bitfield
+      verbatim.
+
+  - id: SF.25
+    title: "`UCIS_SCOPE_EXPR_ISHIERARCHICAL`"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Expression decomposes hierarchically scopes.flags carries the bitfield
+      verbatim.
+
+  - id: SF.26
+    title: "`UCIS_SCOPEFLAG_MARK` / `UCIS_SCOPE_INTERNAL`"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Tool-private mark bits scopes.flags carries the bitfield verbatim.

@@ -1,0 +1,13 @@
+# Large-design STRUCTURE stress (one build per config; 'hello' is the lightest
+# test — coverage *structure* is set by verilation, not the workload).
+# Ordered smallest→largest so the pipeline is validated before the monsters.
+# Resource warning: the bottom three are heavy (long build, many GB RAM/disk,
+# very large coverage.dat). See docs/ncdb-benchmark-plan.md.
+OpenTitan:default:hello
+Caliptra:default:hello
+XuanTie-C910:default:hello
+BlackParrot:4x4:hello
+NVDLA:default:hello
+Vortex:huge:hello
+OpenPiton:32x32:hello
+XiangShan:default-chisel6:hello

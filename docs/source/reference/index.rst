@@ -24,6 +24,18 @@ for **covsight-core**.
    c-api/index
 
 .. toctree::
+   :maxdepth: 2
+   :caption: C++ API
+
+   cpp-api/index
+
+.. toctree::
+   :maxdepth: 1
+   :caption: Backends
+
+   backends/index
+
+.. toctree::
    :maxdepth: 1
    :caption: File Formats
 

@@ -56,3 +56,7 @@ target_link_libraries(ncdb PUBLIC MINIZIP::minizip)
 enable_testing()
 add_subdirectory(tests)
 add_subdirectory(ucis)
+
+# Vendorable UCIS write-streaming library (docs/ucis-writer-impl-plan.md).
+# Standalone: no dependency on libncdb or minizip.
+add_subdirectory(ucis-writer)

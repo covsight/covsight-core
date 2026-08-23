@@ -617,3 +617,145 @@ followed by that many UTF-8 bytes.
 * ``state_bytes`` – one u8 per row (state value 0–4).
 * ``comment_idxs`` – one u16 LE per row (index into comment table, or
   ``0xFFFF`` if no comment).
+
+NCDB vs Parquet: when to use which
+==================================
+
+NCDB and the :doc:`Parquet dataset <parquet-mapping>` are peer backends behind
+one API, not competitors: the same database converts losslessly in either
+direction, so this is an operational choice, not an architectural one.
+
+**NCDB is the edge / at-rest format.**  Shape-aware members — tiered
+test↔cover associations, vector-toggle packing, a shared string table — encode
+coverage structure that a general columnar format has no way to express.
+Nothing else gets close on a single database.
+
+**Parquet is the central / query format.**  A dataset holds N runs as
+``run_id`` partitions, so merging is a query, per-run provenance survives it,
+and any SQL engine can read the files directly.
+
+Measured
+--------
+
+On a 1.24M-bin Verilator design (97% toggle points); Parquet at zstd-19:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 34 22 22 22
+
+   * - Metric
+     - NCDB
+     - Parquet
+     - Notes
+   * - Size, one run
+     - **771 KB**
+     - 2.8 MB
+     - 3.7× — but see the note on per-test data below
+   * - Size, 16 runs kept
+     - 11.8 MB
+     - **9.5 MB**
+     - Definitions stored once vs repeated in every ``.cdb``
+   * - Size, 64 runs kept
+     - 47.1 MB
+     - **31.4 MB**
+     - Marginal cost 0.74 MB/run vs 0.46 MB/run
+   * - Size, 64 runs merged away
+     - **0.75 MB**
+     - n/a
+     - The *file-to-file* merge collapses per-run counts; a multi-run archive keeps them
+   * - Merge, 4 runs
+     - **0.64 s**
+     - 1.03 s
+     - ``NcdbMerger`` adds aligned arrays; no keying at all
+   * - Merge, 16 runs
+     - 1.91 s
+     - **1.63 s**
+     - Arrow's vectorized ``group_by`` scales better with run count
+   * - Full read (scan)
+     - **3.4 s**
+     - 6.0 s
+     - Same UCIS walk both sides
+   * - Write, one run
+     - **1.8 s**
+     - 5.8 s (snappy)
+     - Parquet pays for columnarization
+   * - Targeted rollup
+     - full scan
+     - **0.21 s**
+     - Predicate/column pushdown via DuckDB
+   * - Merge any subset, repeatedly
+     - re-merge
+     - **no write**
+     - Merge is a view over selected partitions
+
+Reading the table
+-----------------
+
+* **Storing one database:** NCDB, decisively.
+* **Storing a regression and keeping every run:** use a **multi-run archive**
+  rather than N files.  It stores the schema once, which is 63% of a `.cdb` on
+  sparse counts and ~48% when they are dense; measured saving against N files is
+  **2.46× (sparse) / 1.85× (count-heavy) at N=16**.  That takes back the
+  crossover: at N=16 a multi-run archive is 4.8 MB against the Parquet dataset's
+  9.5 MB.
+* **Merging fast:** roughly a tie, and it depends on N.  NCDB leads at small
+  run counts; Parquet's vectorized aggregation overtakes it around N≈8 and
+  pulls further ahead after that.  Note NCDB's figures are its *pure-Python*
+  floor here — the C accelerator was not built, and handles only 2-source
+  merges today.
+* **Merging repeatedly, or a different subset each time:** Parquet, where a
+  merge writes nothing at all.
+* **Asking which run or test hit a bin:** either, now.  Merging N *files* with
+  ``NcdbMerger`` collapses the per-run count arrays, but a **multi-run archive**
+  keeps one array per run and merges on read — see
+  :doc:`../backends/index`.  Parquet still wins if the question is asked in
+  SQL rather than through the object API.
+
+.. warning::
+
+   When comparing merge timings, use
+   :class:`~covsight.core.ncdb.ncdb_merger.NcdbMerger`, not
+   :class:`~covsight.core.merge.db_merger.DbMerger`.  The latter is the generic
+   object-API merge for combining *different* schemas and is roughly two orders
+   of magnitude slower — 129.7 s against 1.9 s at N=16 — so benchmarking it as
+   "the NCDB merge" badly misrepresents the format.
+
+.. important::
+
+   **The size ratio is conditional on per-test contribution data.** The table
+   above is measured on databases with no per-test contributions, because a
+   Verilator ``coverage.dat`` carries none. Adding them changes the answer:
+
+   .. list-table::
+      :header-rows: 1
+      :widths: 40 20 20 20
+
+      * - Per-test data
+        - NCDB
+        - Parquet
+        - Ratio
+      * - none (the table above)
+        - 771 KB
+        - 2.82 MB
+        - 3.66×
+      * - clustered (a test hits bins together)
+        - 779 KB
+        - 2.84 MB
+        - 3.65×
+      * - unclustered (scattered hits)
+        - 1.73 MB
+        - 3.65 MB
+        - **2.11×**
+
+   NCDB's ``contrib/`` members are delta-encoded to exploit spatial locality,
+   so they nearly vanish when a test's hits are clustered and roughly double
+   the file when they are not. Merge times converge the same way: NCDB leads
+   1.5× on clustered data and is level on unclustered.
+
+   Which case real per-test coverage resembles is not something the current
+   benchmark can answer — RTLMeter emits no per-test breakdown, so both are
+   synthetic bounds.
+
+Raw numbers and the harness live in
+:file:`bench/coverage/coverage_to_parquet.py` and
+:file:`docs/ncdb-benchmark-results.md`.

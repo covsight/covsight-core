@@ -60,11 +60,27 @@ class MemScope(MemObj,Scope):
         self.m_type = type
         self.m_flags = flags
         self.m_goal = -1
-        self.m_source_type = 0
         self.m_is_under_du = 0
         self.m_children = []
         self.m_cover_items : List['CoverIndex'] = []
         
+    @property
+    def m_source_type(self) -> int:
+        """The scope's source language, as the `UCIS_INT_SCOPE_SOURCE_TYPE`
+        property spells it.
+
+        An alias of :attr:`m_source`, not a second field. They were separate,
+        and `m_source_type` was initialized to 0 rather than from the `source`
+        argument, so every scope reported its language as `UCIS_VHDL` no matter
+        how it was created -- the constructor's value reached storage and the
+        property's did not. One fact, one field.
+        """
+        return int(self.m_source) if self.m_source is not None else 0
+
+    @m_source_type.setter
+    def m_source_type(self, value):
+        self.m_source = value if isinstance(value, SourceT) else SourceT(int(value))
+
     def addChild(self, c):
         self.m_children.append(c)
         

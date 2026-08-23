@@ -122,6 +122,18 @@ class FlagsT(IntFlag):
     
     # Block coverage flags
     SCOPE_BLOCK_ISBRANCH = 0x01000000
-    """Block scope represents a branch decision."""
+    """UCIS_BBLOCK scope contributes to both block and branch coverage."""
+
+    SCOPE_SAMPLE_TRUE = 0x00200000
+    """UCIS_COVERGROUP / UCIS_COVERINSTANCE has runtime samples."""
+
+    SCOPE_EXPR_ISHIERARCHICAL = 0x02000000
+    """UCIS_EXPR / UCIS_COND is represented hierarchically."""
+
+    SCOPEFLAG_MARK = 0x08000000
+    """Temporary mark, for traversal algorithms. Not persistent state."""
+
+    SCOPE_INTERNAL = 0xF0000000
+    """Reserved for implementation-internal use."""
 
 

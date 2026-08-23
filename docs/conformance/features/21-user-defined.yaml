@@ -1,0 +1,74 @@
+# UCIS conformance registry -- section 21: User-defined coverage
+#
+# GENERATED SKELETON, HAND-MAINTAINED THEREAFTER.
+# Records intent only: what the backend is expected to do with each feature.
+# Status ("is it tested?", "is it documented?") is computed by
+# tools/gen_conformance_matrix.py and never written here.
+#
+# See docs/conformance/README.md.
+
+section:
+  number: 21
+  title: "User-defined coverage"
+  spec_ref: "§ 6.6.3"
+
+features:
+  - id: UD.1
+    title: "`UCIS_USERBIN` / `UCIS_GENERICBIN` for arbitrary user-defined bins"
+    spec_ref: "§ 6.6.3"
+    kind: feature
+    backends:
+      parquet:
+        scope: extended
+        reason: >
+          User-defined coverage carries vendor-specific semantics by definition,
+          so no reader can interpret it portably. The rows round-trip; the
+          meaning does not travel.
+    notes: >
+      User-defined bins are ordinary coveritems with a user cover_type;
+      nothing about them is a schema fork.
+
+  - id: UD.2
+    title: "`UCIS_USERBITS` reserved bit-range on cover types"
+    spec_ref: "§ 6"
+    kind: feature
+    backends:
+      parquet:
+        scope: extended
+        reason: >
+          User-defined coverage carries vendor-specific semantics by definition,
+          so no reader can interpret it portably. The rows round-trip; the
+          meaning does not travel.
+    notes: >
+      User-defined bins are ordinary coveritems with a user cover_type;
+      nothing about them is a schema fork.
+
+  - id: UD.3
+    title: "`UCIS_STR_GENERIC` generic string property"
+    spec_ref: "§ 8.3.2"
+    kind: feature
+    backends:
+      parquet:
+        scope: extended
+        reason: >
+          User-defined coverage carries vendor-specific semantics by definition,
+          so no reader can interpret it portably. The rows round-trip; the
+          meaning does not travel.
+    notes: >
+      User-defined bins are ordinary coveritems with a user cover_type;
+      nothing about them is a schema fork.
+
+  - id: UD.4
+    title: "`UCIS_HAS_ACTION` / `UCIS_HAS_COUNT` cover flags"
+    spec_ref: "§ 6"
+    kind: feature
+    backends:
+      parquet:
+        scope: extended
+        reason: >
+          User-defined coverage carries vendor-specific semantics by definition,
+          so no reader can interpret it portably. The rows round-trip; the
+          meaning does not travel.
+    notes: >
+      User-defined bins are ordinary coveritems with a user cover_type;
+      nothing about them is a schema fork.

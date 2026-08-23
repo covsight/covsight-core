@@ -1,0 +1,362 @@
+# UCIS conformance registry -- section 6: Coveritems
+#
+# GENERATED SKELETON, HAND-MAINTAINED THEREAFTER.
+# Records intent only: what the backend is expected to do with each feature.
+# Status ("is it tested?", "is it documented?") is computed by
+# tools/gen_conformance_matrix.py and never written here.
+#
+# See docs/conformance/README.md.
+
+section:
+  number: 6
+  title: "Coveritems"
+  spec_ref: "§ 8.11"
+
+features:
+  - id: C6.1
+    title: "`ucis_CreateNextCover(db, parent, name, data, srcinfo)` → cover index"
+    spec_ref: "§ 8.11.1"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+
+  - id: C6.2
+    title: "`ucis_RemoveCover(db, parent, coverindex)`"
+    spec_ref: "§ 8.11.2"
+    kind: feature
+    backends:
+      parquet:
+        scope: deferred
+        reason: >
+          In-place removal from an append-only columnar dataset. The write path
+          is a batch loader and has no delete; removal would be expressed as
+          rewriting the definition tables, which is a separate feature from the
+          UCIS call.
+        adr: docs/adr/0003-parquet-backend.md
+
+  - id: C6.3
+    title: "`ucis_GetCoverData(db, parent, coverindex, &name, &data, &srcinfo)`"
+    spec_ref: "§ 8.11.3"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+
+  - id: C6.4
+    title: "`ucis_SetCoverData(db, parent, coverindex, data)`"
+    spec_ref: "§ 8.11.4"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+
+  - id: C6.5
+    title: "`ucis_IncrementCover(db, parent, coverindex, delta)` — incremental update"
+    spec_ref: "§ 8.11.5"
+    kind: feature
+    backends:
+      parquet:
+        scope: deferred
+        reason: >
+          Additive update is expressed as an appended run plus GROUP BY SUM, not
+          as in-place increment. Whether the backend should emulate the call
+          over that model is undecided.
+        adr: docs/adr/0003-parquet-backend.md
+
+  - id: C6.6
+    title: "`ucis_GetCoverFlag` / `ucis_SetCoverFlag` / `ucis_GetCoverFlags`"
+    spec_ref: "§ 8.11.6–8"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+
+  - id: BT.1
+    title: "`UCIS_CVGBIN`"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Covergroup coverpoint/cross bin (§ 6.4.2) coveritems.cover_type carries
+      the bin type; the merge operator is keyed on it, which is why every
+      value has to survive exactly (see X.5 for PEAKACTIVEBIN).
+
+  - id: BT.2
+    title: "`UCIS_COVERBIN`"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      SVA/PSL cover hit (§ 6.6.1) coveritems.cover_type carries the bin type;
+      the merge operator is keyed on it, which is why every value has to
+      survive exactly (see X.5 for PEAKACTIVEBIN).
+
+  - id: BT.3
+    title: "`UCIS_ASSERTBIN`"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Generic assertion bin (§ 6.6.2) coveritems.cover_type carries the bin
+      type; the merge operator is keyed on it, which is why every value has to
+      survive exactly (see X.5 for PEAKACTIVEBIN).
+
+  - id: BT.4
+    title: "`UCIS_SCBIN`"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Sequence-cover bin coveritems.cover_type carries the bin type; the merge
+      operator is keyed on it, which is why every value has to survive exactly
+      (see X.5 for PEAKACTIVEBIN).
+
+  - id: BT.5
+    title: "`UCIS_ZINBIN`"
+    kind: feature
+    backends:
+      parquet:
+        scope: out_of_scope
+        reason: >
+          UCIS 1.0 defines no UCIS_ZINBIN cover type; the catalog row was an
+          error.
+    notes: >
+      "Zero-In" bin (vendor-extension placeholder) coveritems.cover_type
+      carries the bin type; the merge operator is keyed on it, which is why
+      every value has to survive exactly (see X.5 for PEAKACTIVEBIN).
+
+  - id: BT.6
+    title: "`UCIS_STMTBIN`"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Statement coverage (§ 6.5.3) coveritems.cover_type carries the bin type;
+      the merge operator is keyed on it, which is why every value has to
+      survive exactly (see X.5 for PEAKACTIVEBIN).
+
+  - id: BT.7
+    title: "`UCIS_BRANCHBIN`"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Branch coverage (§ 6.5.2) coveritems.cover_type carries the bin type;
+      the merge operator is keyed on it, which is why every value has to
+      survive exactly (see X.5 for PEAKACTIVEBIN).
+
+  - id: BT.8
+    title: "`UCIS_EXPRBIN`"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Expression-truth-table row (§ 6.5.4) coveritems.cover_type carries the
+      bin type; the merge operator is keyed on it, which is why every value
+      has to survive exactly (see X.5 for PEAKACTIVEBIN).
+
+  - id: BT.9
+    title: "`UCIS_CONDBIN`"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Condition coverage (§ 6.5.4) coveritems.cover_type carries the bin type;
+      the merge operator is keyed on it, which is why every value has to
+      survive exactly (see X.5 for PEAKACTIVEBIN).
+
+  - id: BT.10
+    title: "`UCIS_TOGGLEBIN`"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Toggle direction (§ 6.5.5) coveritems.cover_type carries the bin type;
+      the merge operator is keyed on it, which is why every value has to
+      survive exactly (see X.5 for PEAKACTIVEBIN).
+
+  - id: BT.11
+    title: "`UCIS_FSMBIN` (= `UCIS_STATEBIN` / `UCIS_TRANSBIN`)"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      FSM state or arc (§ 6.5.6) coveritems.cover_type carries the bin type;
+      the merge operator is keyed on it, which is why every value has to
+      survive exactly (see X.5 for PEAKACTIVEBIN).
+
+  - id: BT.12
+    title: "`UCIS_USERBIN` (= `UCIS_GENERICBIN`)"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      User-defined bin coveritems.cover_type carries the bin type; the merge
+      operator is keyed on it, which is why every value has to survive exactly
+      (see X.5 for PEAKACTIVEBIN).
+
+  - id: BT.13
+    title: "`UCIS_PASSBIN`"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Assertion pass counter coveritems.cover_type carries the bin type; the
+      merge operator is keyed on it, which is why every value has to survive
+      exactly (see X.5 for PEAKACTIVEBIN).
+
+  - id: BT.14
+    title: "`UCIS_FAILBIN`"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Assertion fail counter coveritems.cover_type carries the bin type; the
+      merge operator is keyed on it, which is why every value has to survive
+      exactly (see X.5 for PEAKACTIVEBIN).
+
+  - id: BT.15
+    title: "`UCIS_VACUOUSBIN`"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Assertion vacuous-pass counter coveritems.cover_type carries the bin
+      type; the merge operator is keyed on it, which is why every value has to
+      survive exactly (see X.5 for PEAKACTIVEBIN).
+
+  - id: BT.16
+    title: "`UCIS_DISABLEDBIN`"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Assertion disabled counter coveritems.cover_type carries the bin type;
+      the merge operator is keyed on it, which is why every value has to
+      survive exactly (see X.5 for PEAKACTIVEBIN).
+
+  - id: BT.17
+    title: "`UCIS_ATTEMPTBIN`"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Assertion attempt counter coveritems.cover_type carries the bin type;
+      the merge operator is keyed on it, which is why every value has to
+      survive exactly (see X.5 for PEAKACTIVEBIN).
+
+  - id: BT.18
+    title: "`UCIS_ACTIVEBIN`"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Assertion active counter coveritems.cover_type carries the bin type; the
+      merge operator is keyed on it, which is why every value has to survive
+      exactly (see X.5 for PEAKACTIVEBIN).
+
+  - id: BT.19
+    title: "`UCIS_PEAKACTIVEBIN`"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Assertion peak-active counter coveritems.cover_type carries the bin
+      type; the merge operator is keyed on it, which is why every value has to
+      survive exactly (see X.5 for PEAKACTIVEBIN).
+
+  - id: BT.20
+    title: "`UCIS_IGNOREBIN`"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Ignore-bin (covergroup) coveritems.cover_type carries the bin type; the
+      merge operator is keyed on it, which is why every value has to survive
+      exactly (see X.5 for PEAKACTIVEBIN).
+
+  - id: BT.21
+    title: "`UCIS_ILLEGALBIN`"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Illegal-bin (covergroup) coveritems.cover_type carries the bin type; the
+      merge operator is keyed on it, which is why every value has to survive
+      exactly (see X.5 for PEAKACTIVEBIN).
+
+  - id: BT.22
+    title: "`UCIS_DEFAULTBIN`"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Default-bin (covergroup) coveritems.cover_type carries the bin type; the
+      merge operator is keyed on it, which is why every value has to survive
+      exactly (see X.5 for PEAKACTIVEBIN).
+
+  - id: BT.23
+    title: "`UCIS_BLOCKBIN`"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Block-level rollup bin coveritems.cover_type carries the bin type; the
+      merge operator is keyed on it, which is why every value has to survive
+      exactly (see X.5 for PEAKACTIVEBIN).
+
+  - id: BT.24
+    title: "`UCIS_COUNT`"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Generic counter coveritems.cover_type carries the bin type; the merge
+      operator is keyed on it, which is why every value has to survive exactly
+      (see X.5 for PEAKACTIVEBIN).
+
+  - id: BT.25
+    title: "`UCIS_USERBITS`"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Reserved bit-range for vendor extensions coveritems.cover_type carries
+      the bin type; the merge operator is keyed on it, which is why every
+      value has to survive exactly (see X.5 for PEAKACTIVEBIN).
+
+  - id: BT.26
+    title: "`UCIS_RESERVEDBIN`"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      High-byte reserved range coveritems.cover_type carries the bin type; the
+      merge operator is keyed on it, which is why every value has to survive
+      exactly (see X.5 for PEAKACTIVEBIN).

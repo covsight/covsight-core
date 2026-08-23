@@ -1,0 +1,921 @@
+# UCIS conformance registry -- section 8: Properties
+#
+# HAND-AUTHORED (T21). Records intent only: what the backend is expected to do
+# with each feature. Status ("is it tested?", "is it documented?") is computed
+# by tools/gen_conformance_matrix.py and never written here.
+#
+# See docs/conformance/README.md.
+
+section:
+  number: 8
+  title: "Properties"
+  spec_ref: "§ 8.3"
+  notes: >
+    The typed-property vocabulary: the prop_id key space of the properties
+    table plus the get/set surface that reaches it. Entries whose token UCIS
+    1.0 does not define are out_of_scope with the reason recorded, as in
+    section 6 (BT.5) and section 4 (ST.24, ST.37, ST.38).
+
+features:
+
+  - id: PI.1
+    title: "`UCIS_INT_IS_MODIFIED` — modified since the stored UCISDB was opened (read-only)"
+    spec_ref: "§ 8.3.1"
+    kind: feature
+    backends:
+      parquet:
+        scope: out_of_scope
+        reason: >
+          UCIS 1.0 s 8.3 states this property is in-memory only and is not
+          stored in the database, so no persistent representation can exist.
+    notes: >
+      Applies to: db. Where it lives: not stored.
+
+  - id: PI.2
+    title: "`UCIS_INT_MODIFIED_SINCE_SIM` — modified since the end of the simulation run (read-only)"
+    spec_ref: "§ 8.3.1"
+    kind: feature
+    backends:
+      parquet:
+        scope: out_of_scope
+        reason: >
+          In-memory only per UCIS 1.0 s 8.3, like IS_MODIFIED.
+    notes: >
+      Applies to: db. Where it lives: not stored.
+
+  - id: PI.3
+    title: "`UCIS_INT_NUM_TESTS` — number of UCIS_HISTORYNODE_TEST nodes (read-only)"
+    spec_ref: "§ 8.3.1"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Applies to: db. Where it lives: derived: count of `history_nodes` rows
+      with `kind = 1`.
+
+  - id: PI.4
+    title: "`UCIS_INT_SCOPE_WEIGHT` — scope weight"
+    spec_ref: "§ 8.3.1"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Applies to: scope. Where it lives: `scopes.weight` (promoted, bit 0).
+
+  - id: PI.5
+    title: "`UCIS_INT_SCOPE_GOAL` — scope goal"
+    spec_ref: "§ 8.3.1"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Applies to: scope. Where it lives: `scopes.goal` (promoted, bit 1).
+
+  - id: PI.6
+    title: "`UCIS_INT_SCOPE_SOURCE_TYPE` — source language of the scope (`ucisSourceT`, SL.*)"
+    spec_ref: "§ 8.3.1"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Applies to: scope. Where it lives: `scopes.source` (promoted, bit 4).
+
+  - id: PI.7
+    title: "`UCIS_INT_NUM_CROSSED_CVPS` — number of coverpoints in a cross (read-only)"
+    spec_ref: "§ 8.3.1"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Applies to: scope. Where it lives: `properties` row. Carried as an EAV
+      row when the source answers it. The coverpoint *references* themselves
+      are not carried -- see CG.11 / S4.19 (T23).
+
+  - id: PI.8
+    title: "`UCIS_INT_SCOPE_IS_UNDER_DU` — scope is underneath a design-unit scope (read-only)"
+    spec_ref: "§ 8.3.1"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Applies to: scope. Where it lives: `properties` row (also derivable by
+      walking `parent_id`).
+
+  - id: PI.9
+    title: "`UCIS_INT_SCOPE_IS_UNDER_COVERINSTANCE` — scope is underneath a covergroup instance (read-only)"
+    spec_ref: "§ 8.3.1"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Applies to: scope. Where it lives: `properties` row (also derivable by
+      walking `parent_id`).
+
+  - id: PI.10
+    title: "`UCIS_INT_SCOPE_NUM_COVERITEMS` — number of coveritems under the scope (read-only)"
+    spec_ref: "§ 8.3.1"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Applies to: scope. Where it lives: derived: count of `coveritems` rows
+      with that `scope_id`.
+
+  - id: PI.11
+    title: "`UCIS_INT_SCOPE_NUM_EXPR_TERMS` — number of '#'-delimited expression terms"
+    spec_ref: "§ 8.3.1"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Applies to: scope. Where it lives: `properties` row.
+
+  - id: PI.12
+    title: "`UCIS_INT_TOGGLE_TYPE` — toggle type (`ucisToggleTypeT`)"
+    spec_ref: "§ 8.3.1"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Applies to: scope. Where it lives: `properties` row.
+
+  - id: PI.13
+    title: "`UCIS_INT_TOGGLE_DIR` — toggle direction (`ucisToggleDirT`)"
+    spec_ref: "§ 8.3.1"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Applies to: scope. Where it lives: `properties` row.
+
+  - id: PI.14
+    title: "`UCIS_INT_TOGGLE_COVERED` — the toggle object is covered"
+    spec_ref: "§ 8.3.1"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Applies to: scope. Where it lives: derived from `counts` (promoted bit
+      3, **no column**).
+
+  - id: PI.15
+    title: "`UCIS_INT_BRANCH_HAS_ELSE` — branch has an 'else' coveritem"
+    spec_ref: "§ 8.3.1"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Applies to: scope. Where it lives: `properties` row; also
+      `UCIS_IS_BR_ELSE` on the bin.
+
+  - id: PI.16
+    title: "`UCIS_INT_BRANCH_ISCASE` — branch represents a 'case' statement"
+    spec_ref: "§ 8.3.1"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Applies to: scope. Where it lives: `properties` row.
+
+  - id: PI.17
+    title: "`UCIS_INT_COVER_GOAL` — coveritem goal"
+    spec_ref: "§ 8.3.1"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Applies to: cover. Where it lives: `coveritems.goal` (promoted, bit 2).
+
+  - id: PI.18
+    title: "`UCIS_INT_COVER_LIMIT` — coverage count limit for the coveritem"
+    spec_ref: "§ 8.3.1"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Applies to: cover. Where it lives: `coveritems.limit`.
+
+  - id: PI.19
+    title: "`UCIS_INT_COVER_WEIGHT` — coveritem weight"
+    spec_ref: "§ 8.3.1"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Applies to: cover. Where it lives: `coveritems.weight`.
+
+  - id: PI.20
+    title: "`UCIS_INT_TEST_STATUS` — test run status (`ucisTestStatusT`)"
+    spec_ref: "§ 8.3.1"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Applies to: history. Where it lives: `history_nodes.status` (promoted,
+      bit 0).
+
+  - id: PI.21
+    title: "`UCIS_INT_TEST_COMPULSORY` — test run is compulsory"
+    spec_ref: "§ 8.3.1"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Applies to: history. Where it lives: `history_nodes.compulsory`
+      (promoted, bit 1).
+
+  - id: PI.22
+    title: "`UCIS_INT_STMT_INDEX` — index of the statement on a line"
+    spec_ref: "§ 8.3.1"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Applies to: scope. Where it lives: `properties` row.
+
+  - id: PI.23
+    title: "`UCIS_INT_BRANCH_COUNT` — total branch execution count"
+    spec_ref: "§ 8.3.1"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Applies to: scope. Where it lives: `properties` row.
+
+  - id: PI.24
+    title: "`UCIS_INT_FSM_STATEVAL` — FSM state value"
+    spec_ref: "§ 8.3.1"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Applies to: scope. Where it lives: `properties` row.
+
+  - id: PI.25
+    title: "`UCIS_INT_CVG_ATLEAST` — covergroup `at_least` option"
+    spec_ref: "§ 8.3.1"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Applies to: scope. Where it lives: `properties` row (per-bin `at_least`
+      is `coveritems.at_least`).
+
+  - id: PI.26
+    title: "`UCIS_INT_CVG_AUTOBINMAX` — covergroup `auto_bin_max` option"
+    spec_ref: "§ 8.3.1"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Applies to: scope. Where it lives: `properties` row.
+
+  - id: PI.27
+    title: "`UCIS_INT_CVG_DETECTOVERLAP` — covergroup `detect_overlap` option"
+    spec_ref: "§ 8.3.1"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Applies to: scope. Where it lives: `properties` row.
+
+  - id: PI.28
+    title: "`UCIS_INT_CVG_NUMPRINTMISSING` — covergroup `cross_num_print_missing` option"
+    spec_ref: "§ 8.3.1"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Applies to: scope. Where it lives: `properties` row.
+
+  - id: PI.29
+    title: "`UCIS_INT_CVG_STROBE` — covergroup `strobe` option"
+    spec_ref: "§ 8.3.1"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Applies to: scope. Where it lives: `properties` row.
+
+  - id: PI.30
+    title: "`UCIS_INT_CVG_PERINSTANCE` — covergroup `per_instance` option"
+    spec_ref: "§ 8.3.1"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Applies to: scope. Where it lives: `properties` row.
+
+  - id: PI.31
+    title: "`UCIS_INT_CVG_GETINSTCOV` — covergroup `get_inst_coverage` option"
+    spec_ref: "§ 8.3.1"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Applies to: scope. Where it lives: `properties` row.
+
+  - id: PI.32
+    title: "`UCIS_INT_CVG_MERGEINSTANCES` — covergroup `merge_instances` option"
+    spec_ref: "§ 8.3.1"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Applies to: scope. Where it lives: `properties` row.
+
+  - id: PI.33
+    title: "`UCIS_INT_TOGGLE_METRIC` — toggle metric specialization (`ucisToggleMetricT`)"
+    spec_ref: "§ 8.3.1"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Applies to: scope. Where it lives: `properties` row. Normative in the
+      ucis_CreateToggle documentation but absent from the ucisIntPropertyEnumT
+      typedef in this repo's markdown conversion of the specification -- the
+      same conversion loss as UCIS_SCBIN (BT.4).
+
+  - id: PI.34
+    title: "`UCIS_INT_SUPPRESS_MODIFIED` — suppress the in-memory modification flag"
+    spec_ref: "§ 8.3.1"
+    kind: feature
+    backends:
+      parquet:
+        scope: out_of_scope
+        reason: >
+          Write-side control of the in-memory IS_MODIFIED flag; it appears in
+          a UCIS 1.0 s 8.3 example rather than the typedef, and like the flag
+          it controls it has no persistent representation.
+    notes: >
+      Applies to: db. Where it lives: not stored.
+
+  - id: PI.35
+    title: "UCIS_INT_SCOPE_PERINSTANCE (not defined by UCIS 1.0)"
+    spec_ref: "§ 8.3.1"
+    kind: feature
+    backends:
+      parquet:
+        scope: out_of_scope
+        reason: >
+          Not defined by UCIS 1.0: the token appears nowhere in the
+          specification. The per-instance option is CVG_PERINSTANCE (PI.30).
+
+  - id: PS.1
+    title: "`UCIS_STR_FILE_NAME` — UCISDB file/directory name (read-only)"
+    spec_ref: "§ 8.3.2"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Applies to: db. Where it lives: the dataset directory itself; per-scope
+      source files are `source_files.path`.
+
+  - id: PS.2
+    title: "`UCIS_STR_SCOPE_NAME` — scope name"
+    spec_ref: "§ 8.3.2"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Applies to: scope. Where it lives: `scopes.name`.
+
+  - id: PS.3
+    title: "`UCIS_STR_SCOPE_HIER_NAME` — hierarchical scope name"
+    spec_ref: "§ 8.3.2"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Applies to: scope. Where it lives: derived: walk `parent_id`.
+
+  - id: PS.4
+    title: "`UCIS_STR_INSTANCE_DU_NAME` — the instance's design-unit name"
+    spec_ref: "§ 8.3.2"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Applies to: scope. Where it lives: `scopes.instance_du_id` -> that DU's
+      `name`.
+
+  - id: PS.5
+    title: "`UCIS_STR_UNIQUE_ID` — scope or coveritem unique id (read-only)"
+    spec_ref: "§ 8.3.2"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Applies to: scope/cover. Where it lives: `scopes.unique_id` /
+      `(scope_id, local_index)`.
+
+  - id: PS.6
+    title: "`UCIS_STR_VER_STANDARD` — standard, fixed to \"UCIS\""
+    spec_ref: "§ 8.3.2"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Applies to: db. Where it lives: the `properties` map of the
+      `_covsight_parquet.json` manifest.
+
+  - id: PS.7
+    title: "`UCIS_STR_VER_STANDARD_VERSION` — version of the standard"
+    spec_ref: "§ 8.3.2"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Applies to: db. Where it lives: manifest `properties`.
+
+  - id: PS.8
+    title: "`UCIS_STR_VER_VENDOR_ID` — vendor id"
+    spec_ref: "§ 8.3.2"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Applies to: db/history. Where it lives: `history_nodes.vendor_id`
+      (promoted, bit 6).
+
+  - id: PS.9
+    title: "`UCIS_STR_VER_VENDOR_TOOL` — vendor tool"
+    spec_ref: "§ 8.3.2"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Applies to: db/history. Where it lives: `history_nodes.vendor_tool`
+      (promoted, bit 7).
+
+  - id: PS.10
+    title: "`UCIS_STR_VER_VENDOR_VERSION` — vendor tool version"
+    spec_ref: "§ 8.3.2"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Applies to: db/history. Where it lives:
+      `history_nodes.vendor_tool_version` (promoted, bit 8).
+
+  - id: PS.11
+    title: "`UCIS_STR_GENERIC` — miscellaneous string data"
+    spec_ref: "§ 8.3.2"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Applies to: any. Where it lives: `properties` row.
+
+  - id: PS.12
+    title: "`UCIS_STR_ITH_CROSSED_CVP_NAME` — i-th crossed coverpoint name of a cross"
+    spec_ref: "§ 8.3.2"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Applies to: scope. Where it lives: `properties` row (scope-level only).
+      The indexed accessor -- the i-th name of an n-way cross -- is not
+      carried; that is CG.11 / S4.19 (T23). A single scope-level value
+      round-trips.
+
+  - id: PS.13
+    title: "`UCIS_STR_HIST_CMDLINE` — test run command line"
+    spec_ref: "§ 8.3.2"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Applies to: history. Where it lives: `history_nodes.cmdline` (promoted,
+      bit 2).
+
+  - id: PS.14
+    title: "`UCIS_STR_HIST_RUNCWD` — test run working directory"
+    spec_ref: "§ 8.3.2"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Applies to: history. Where it lives: `history_nodes.run_cwd` (promoted,
+      bit 3).
+
+  - id: PS.15
+    title: "`UCIS_STR_COMMENT` — comment"
+    spec_ref: "§ 8.3.2"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Applies to: any. Where it lives: `history_nodes.comment` (promoted, bit
+      5) for history nodes; `properties` row elsewhere.
+
+  - id: PS.16
+    title: "`UCIS_STR_TEST_TIMEUNIT` — test run simulation time unit"
+    spec_ref: "§ 8.3.2"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Applies to: history. Where it lives: `history_nodes.time_unit`.
+
+  - id: PS.17
+    title: "`UCIS_STR_TEST_DATE` — test run date"
+    spec_ref: "§ 8.3.2"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Applies to: history. Where it lives: `history_nodes.date` or `date_int`
+      -- exactly one.
+
+  - id: PS.18
+    title: "`UCIS_STR_TEST_SIMARGS` — test run simulator arguments"
+    spec_ref: "§ 8.3.2"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Applies to: history. Where it lives: `history_nodes.args`.
+
+  - id: PS.19
+    title: "`UCIS_STR_TEST_USERNAME` — test run user name"
+    spec_ref: "§ 8.3.2"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Applies to: history. Where it lives: `history_nodes.user_name`
+      (promoted, bit 4).
+
+  - id: PS.20
+    title: "`UCIS_STR_TEST_NAME` — test run name"
+    spec_ref: "§ 8.3.2"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Applies to: history. Where it lives: `history_props` row. The object API
+      has no distinct test-name accessor; in practice the test name is the
+      history node's logical name (PS.30).
+
+  - id: PS.21
+    title: "`UCIS_STR_TEST_SEED` — test run seed"
+    spec_ref: "§ 8.3.2"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Applies to: history. Where it lives: `history_nodes.seed`.
+
+  - id: PS.22
+    title: "`UCIS_STR_TEST_HOSTNAME` — test run hostname"
+    spec_ref: "§ 8.3.2"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Applies to: history. Where it lives: **not carried**. No column and no
+      object-API accessor, so nothing reaches the dataset. Named in the
+      mapping document's "Structure this mapping does not carry" table.
+
+  - id: PS.23
+    title: "`UCIS_STR_TEST_HOSTOS` — test run host OS"
+    spec_ref: "§ 8.3.2"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Applies to: history. Where it lives: **not carried**.
+      `history_nodes.host_os` exists but is always written null: the object
+      API has no accessor to fill it. Named in the mapping document's
+      "Structure this mapping does not carry" table.
+
+  - id: PS.24
+    title: "`UCIS_STR_EXPR_TERMS` — input-ordered expression terms delimited by '#'"
+    spec_ref: "§ 8.3.2"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Applies to: scope. Where it lives: `properties` row.
+
+  - id: PS.25
+    title: "`UCIS_STR_TOGGLE_CANON_NAME` — toggle object canonical name"
+    spec_ref: "§ 8.3.2"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Applies to: scope. Where it lives: `properties` row.
+
+  - id: PS.26
+    title: "`UCIS_STR_UNIQUE_ID_ALIAS` — scope or coveritem unique-id alias"
+    spec_ref: "§ 8.3.2"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Applies to: scope/cover. Where it lives: `properties` row.
+
+  - id: PS.27
+    title: "`UCIS_STR_DESIGN_VERSION_ID` — version of the design / elaboration id"
+    spec_ref: "§ 8.3.2"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Applies to: scope. Where it lives: `properties` row.
+
+  - id: PS.28
+    title: "`UCIS_STR_DU_SIGNATURE` — design-unit signature, for source-change detection"
+    spec_ref: "§ 8.3.2"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Applies to: scope. Where it lives: `properties` row.
+
+  - id: PS.29
+    title: "`UCIS_STR_HIST_TOOLCATEGORY` — tool category of the history node"
+    spec_ref: "§ 8.3.2"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Applies to: history. Where it lives: `history_nodes.tool_category`.
+
+  - id: PS.30
+    title: "`UCIS_STR_HIST_LOG_NAME` — logical name of the history node"
+    spec_ref: "§ 8.3.2"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Applies to: history. Where it lives: `history_nodes.logical_name`.
+
+  - id: PS.31
+    title: "`UCIS_STR_HIST_PHYS_NAME` — history node physical name"
+    spec_ref: "§ 8.3.2"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Applies to: history. Where it lives: `history_nodes.physical_name`.
+
+  - id: PS.32
+    title: "UCIS_STR_FSM_STATEVAR (not defined by UCIS 1.0)"
+    spec_ref: "§ 8.3.2"
+    kind: feature
+    backends:
+      parquet:
+        scope: out_of_scope
+        reason: >
+          Not defined by UCIS 1.0: the token appears nowhere in the
+          specification. The FSM state variable is carried as UCIS_STR_GENERIC
+          (PS.11) on the FSM scope, which is what the specification's own
+          example does.
+
+  - id: PR.1
+    title: "`UCIS_REAL_HIST_CPUTIME` — test run CPU time"
+    spec_ref: "§ 8.3.3"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Applies to: history. Where it lives: `history_nodes.cpu_time` (promoted,
+      bit 10).
+
+  - id: PR.2
+    title: "`UCIS_REAL_TEST_SIMTIME` — test run simulation time"
+    spec_ref: "§ 8.3.3"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Applies to: history. Where it lives: `history_nodes.sim_time` (promoted,
+      bit 9).
+
+  - id: PR.3
+    title: "`UCIS_REAL_TEST_COST` — relative cost of re-running the test"
+    spec_ref: "§ 8.3.3"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Applies to: history. Where it lives: `history_nodes.cost` (promoted, bit
+      11).
+
+  - id: PR.4
+    title: "`UCIS_REAL_CVG_INST_AVERAGE` — average coverage across covergroup instances"
+    spec_ref: "§ 8.3.3"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Applies to: scope. Where it lives: derived from instance coverage.
+
+  - id: PH.1
+    title: "`UCIS_HANDLE_SCOPE_PARENT` — parent scope"
+    spec_ref: "§ 8.3.4"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Applies to: scope. Where it lives: `scopes.parent_id`.
+
+  - id: PH.2
+    title: "`UCIS_HANDLE_SCOPE_TOP` — top (root) scope"
+    spec_ref: "§ 8.3.4"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Applies to: scope. Where it lives: the `scopes` row whose `parent_id` is
+      null, reached by walking `parent_id`.
+
+  - id: PH.3
+    title: "`UCIS_HANDLE_INSTANCE_DU` — the instance's design-unit scope"
+    spec_ref: "§ 8.3.4"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Applies to: scope. Where it lives: `scopes.instance_du_id`.
+
+  - id: PH.4
+    title: "`UCIS_HANDLE_HIST_NODE_PARENT` — parent history node"
+    spec_ref: "§ 8.3.4"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Applies to: history. Where it lives: `history_nodes.parent_id`.
+
+  - id: PH.5
+    title: "`UCIS_HANDLE_HIST_NODE_ROOT` — top (root) history node"
+    spec_ref: "§ 8.3.4"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Applies to: history. Where it lives: the `history_nodes` row whose
+      `parent_id` is null.
+
+  - id: PH.6
+    title: "UCIS_HANDLE_SCOPE_DU (not defined by UCIS 1.0)"
+    spec_ref: "§ 8.3.4"
+    kind: feature
+    backends:
+      parquet:
+        scope: out_of_scope
+        reason: >
+          Not defined by UCIS 1.0: the token appears only in a s 8.3 example.
+          The enumerated constant is UCIS_HANDLE_INSTANCE_DU (PH.3).
+
+  - id: PP.1
+    title: "`ucis_GetIntProperty(db, obj, coverindex, property)`"
+    spec_ref: "§ 8.3.5"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+
+  - id: PP.2
+    title: "`ucis_SetIntProperty(db, obj, coverindex, property, value)`"
+    spec_ref: "§ 8.3.6"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+
+  - id: PP.3
+    title: "`ucis_GetRealProperty(db, obj, coverindex, property)`"
+    spec_ref: "§ 8.3.7"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+
+  - id: PP.4
+    title: "`ucis_SetRealProperty(db, obj, coverindex, property, value)`"
+    spec_ref: "§ 8.3.8"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+
+  - id: PP.5
+    title: "`ucis_GetStringProperty(db, obj, coverindex, property)`"
+    spec_ref: "§ 8.3.9"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+
+  - id: PP.6
+    title: "`ucis_SetStringProperty(db, obj, coverindex, property, value)`"
+    spec_ref: "§ 8.3.10"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+
+  - id: PP.7
+    title: "`ucis_GetHandleProperty(db, obj, property)`"
+    spec_ref: "§ 8.3.11"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+
+  - id: PP.8
+    title: "`ucis_SetHandleProperty(db, obj, property, value)`"
+    spec_ref: "§ 8.3.12"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+
+  - id: PP.9
+    title: "coverindex semantics: `-1` = the scope, `>= 0` = the cover at that index, ignored for history nodes"
+    spec_ref: "§ 8.3.5"
+    kind: feature
+    backends:
+      parquet:
+        scope: core
+    notes: >
+      Scope-level and per-bin properties share one call; the mapping resolves
+      them to different tables (properties.object_kind), so the distinction
+      has to survive.
+

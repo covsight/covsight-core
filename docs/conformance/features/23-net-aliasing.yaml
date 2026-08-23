@@ -1,0 +1,42 @@
+# UCIS conformance registry -- section 23: Net aliasing
+#
+# GENERATED SKELETON, HAND-MAINTAINED THEREAFTER.
+# Records intent only: what the backend is expected to do with each feature.
+# Status ("is it tested?", "is it documented?") is computed by
+# tools/gen_conformance_matrix.py and never written here.
+#
+# See docs/conformance/README.md.
+
+section:
+  number: 23
+  title: "Net aliasing"
+  spec_ref: "§ 4.10"
+
+features:
+  - id: NA.1
+    title: "Canonical-name property for nets: `UCIS_STR_TOGGLE_CANON_NAME`"
+    spec_ref: "§ 4.10"
+    kind: feature
+    backends:
+      parquet:
+        scope: deferred
+        reason: >
+          Blocked on the § 4.10 net-aliasing scope decision: whether the mapping
+          preserves the alias relation or flattens aliased nets into shared
+          counts. Freezing current behaviour by testing it would pre-empt that
+          decision.
+        adr: docs/adr/0003-parquet-backend.md
+
+  - id: NA.2
+    title: "Multiple-instance roll-up via `UCIS_INST_ONCE`"
+    spec_ref: "§ 4.10"
+    kind: feature
+    backends:
+      parquet:
+        scope: deferred
+        reason: >
+          Blocked on the § 4.10 net-aliasing scope decision: whether the mapping
+          preserves the alias relation or flattens aliased nets into shared
+          counts. Freezing current behaviour by testing it would pre-empt that
+          decision.
+        adr: docs/adr/0003-parquet-backend.md

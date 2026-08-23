@@ -25,6 +25,7 @@ v2 binary history (if present in any source) is merged correctly:
   - SquashLog entries are concatenated (no run_id adjustment needed)
 """
 
+import warnings
 import zipfile
 import json
 import struct
@@ -48,19 +49,93 @@ from .constants import (
 )
 from covsight.core.ncdb._accel import add_uint32_arrays as _add_arrays, HAS_ACCEL as _HAS_ACCEL
 
+from .constants import (
+    MEMBER_ATTRS, MEMBER_TAGS, MEMBER_TOGGLE, MEMBER_FSM, MEMBER_CROSS,
+    MEMBER_FORMAL, MEMBER_DESIGN_UNITS, MEMBER_PROPERTIES,
+    MEMBER_COVERITEM_FLAGS,
+    MEMBER_ISSUES, MEMBER_ISSUES_META, MEMBER_ISSUES_HISTORY,
+)
+from .member_merge import (
+    merge_attrs, merge_coveritem_flags, merge_formal, merge_tags,
+    renumber_contrib,
+)
+from .merge_ops import (
+    MEMBER_MERGE_OPS, MergeOpsReader, merge_counts as _merge_counts_typed,
+)
+
 from covsight.core.api import HistoryNodeKind
 from covsight.core.mem.mem_history_node import MemHistoryNode
+
+
+#: Members that describe the *shape* of the design.  The same-schema path is
+#: entered only when every source shares a `schema_hash`, so these are
+#: identical across sources and are copied from the first one.
+_STRUCTURAL_MEMBERS = frozenset({
+    MEMBER_TOGGLE, MEMBER_FSM, MEMBER_CROSS, MEMBER_DESIGN_UNITS,
+    MEMBER_PROPERTIES, MEMBER_MERGE_OPS,
+    MEMBER_ISSUES, MEMBER_ISSUES_META, MEMBER_ISSUES_HISTORY,
+})
+
+#: Members that can legitimately differ between sources and must be combined.
+#: `coveritem_flags` carries exclusions and waivers, so dropping it silently
+#: changes closure numbers -- which is what the merge used to do.
+_ANNOTATIONAL_MEMBERS = {
+    MEMBER_ATTRS: merge_attrs,
+    MEMBER_TAGS: merge_tags,
+    MEMBER_COVERITEM_FLAGS: merge_coveritem_flags,
+    MEMBER_FORMAL: merge_formal,
+}
+
+
+def _merge_annotational(name: str, payloads: List[bytes]) -> bytes:
+    """Combine one annotational member across sources.
+
+    Short-circuits when every source carries byte-identical content, which is
+    the normal case: runs of the same design share the same exclusions, tags
+    and attributes. That matters for more than elegance -- ``coveritem_flags``
+    is ~2.4 MB *uncompressed* on a 1.2M-bin design, so decoding and re-encoding
+    it per source turned a 1.9 s merge into 6.6 s. Only genuinely divergent
+    annotations pay the full merge.
+    """
+    first = payloads[0]
+    if all(payload == first for payload in payloads[1:]):
+        return first
+    return _ANNOTATIONAL_MEMBERS[name](payloads)
+
+
+class SchemaDriftWarning(UserWarning):
+    """The sources disagree on schema, so the slow merge path was taken."""
+
+
+class SchemaMismatch(ValueError):
+    """The sources disagree on schema and the caller disallowed the fallback."""
 
 
 class NcdbMerger:
     """Merge N NCDB source files into a single NCDB target file."""
 
-    def merge(self, sources: List[str], target: str) -> None:
+    def merge(self, sources: List[str], target: str,
+              allow_cross_schema: bool = True) -> None:
         """Merge *sources* into *target*.
 
         Args:
             sources: List of input .cdb (NCDB) file paths.
             target:  Output .cdb file path (will be overwritten).
+            allow_cross_schema: Permit the slow fallback when the sources do
+                not share a ``schema_hash``.  Pass False to make a
+                differing-schema merge an error instead -- useful in a
+                regression flow, where every run is the same design and drift
+                means something is wrong.
+
+        Raises:
+            SchemaMismatch: If the schemas differ and *allow_cross_schema* is
+                False.
+
+        Note:
+            When schemas differ, merging falls back to rebuilding the whole
+            object graph, which is roughly two orders of magnitude slower
+            (measured 129.7 s against 1.9 s for 16 runs of a 1.2M-bin design).
+            The fallback warns rather than degrading silently.
         """
         if not sources:
             raise ValueError("No source files provided")
@@ -69,12 +144,56 @@ class NcdbMerger:
         manifests = [self._read_manifest(s) for s in sources]
         hashes = [m.schema_hash for m in manifests]
 
-        all_same = len(set(hashes)) == 1
+        all_same = len(set(hashes)) == 1 and self._names_agree(sources, hashes)
 
         if all_same:
             self._merge_same_schema(sources, manifests, target)
         else:
+            distinct = len(set(hashes))
+            message = (
+                "NCDB merge: sources do not share a schema_hash (%d distinct "
+                "schemas across %d files), so the slow cross-schema path is "
+                "used -- it rebuilds the full object graph and is ~2 orders of "
+                "magnitude slower. This usually means the design changed "
+                "between runs." % (distinct, len(sources)))
+            if not allow_cross_schema:
+                raise SchemaMismatch(message)
+            warnings.warn(message, SchemaDriftWarning, stacklevel=2)
             self._merge_cross_schema(sources, target)
+
+    @staticmethod
+    def _names_agree(sources: List[str], hashes: List[str]) -> bool:
+        """Guard the fast path against the v1 ``schema_hash`` blind spot.
+
+        A ``sha256v2:`` hash already covers ``strings.bin``, so equal v2 hashes
+        are sufficient and this returns immediately.
+
+        Any other hash -- a ``sha256:`` v1 hash, an empty one, or an unknown
+        form -- is treated as unverified.  A v1 hash digests ``scope_tree.bin``
+        alone -- and that
+        member stores string-table *references*, not strings.  Two unrelated
+        designs with the same shape hash identically under v1, so taking the
+        fast path on that basis adds one design's counts into the other's bins
+        and reports the total under the first source's names.  Databases
+        written before the v2 hash, and those written by implementations that
+        still emit v1, carry exactly that ambiguity, so for them the names are
+        compared directly.
+
+        The comparison is byte-level on the serialized string table, which is
+        cheap next to the merge itself and exact: the fast path stays available
+        for legacy files that really are the same design.
+        """
+        if hashes and hashes[0].startswith("sha256v2:"):
+            return True
+        first = None
+        for path in sources:
+            with zipfile.ZipFile(path, "r") as zf:
+                strings = zf.read(MEMBER_STRINGS)
+            if first is None:
+                first = strings
+            elif strings != first:
+                return False
+        return True
 
     # ── Same-schema fast path ─────────────────────────────────────────────
 
@@ -87,14 +206,34 @@ class NcdbMerger:
             if len(counts) != n:
                 raise ValueError(
                     f"Count array length mismatch: expected {n}, got {len(counts)}")
-        merged_counts = list(map(sum, zip(*all_counts)))
-        if _HAS_ACCEL and len(all_counts) == 2:
+
+        # One pass over the sources for everything that is not counts or
+        # history: contributions, the annotational members, and the merge-op
+        # table.  Opening each archive once matters -- this is the hot path.
+        per_source_contrib, annotational, merge_ops_payloads = \
+            self._scan_sources(sources)
+
+        # Not every bin is additive: a peak-active count is a high-water mark.
+        # `merge_ops.bin` lists the exceptions, so this stays type-aware
+        # without decoding the scope tree.  Absent (the common case) means
+        # everything sums.
+        ops = {}
+        for payload in merge_ops_payloads:
+            ops.update(MergeOpsReader().deserialize(payload))
+        if ops:
+            merged_counts = _merge_counts_typed(all_counts, ops)
+        elif _HAS_ACCEL and len(all_counts) == 2:
             # For two-source merges use the C element-wise adder
             merged_counts = _add_arrays(all_counts[0], all_counts[1])
+        else:
+            merged_counts = list(map(sum, zip(*all_counts)))
 
-        # Gather all history nodes from all sources
+        # Gather all history nodes from all sources, recording where each
+        # source's nodes land so its contributions can follow them.
         all_history = []
+        history_offsets = []
         for s in sources:
+            history_offsets.append(len(all_history))
             all_history.extend(self._read_history(s))
 
         # Add a MERGE history node
@@ -125,20 +264,35 @@ class NcdbMerger:
             history_format=history_format,
         )
 
-        # Read schema members verbatim from first source
+        # Read schema members verbatim from first source.  The same-schema
+        # path is only entered when every source shares a `schema_hash`, so
+        # these are identical by construction.
         with zipfile.ZipFile(sources[0], "r") as zf:
-            zf_names = zf.namelist()
             strings_bytes    = zf.read(MEMBER_STRINGS)
             scope_tree_bytes = zf.read(MEMBER_SCOPE_TREE)
             sources_bytes    = zf.read(MEMBER_SOURCES)
-            # Gather existing contrib/* members from all sources (copy verbatim)
-            contrib_members_all: Dict[str, bytes] = {}
+            structural_members = {
+                name: zf.read(name) for name in zf.namelist()
+                if name in _STRUCTURAL_MEMBERS
+            }
 
-        for src in sources:
-            with zipfile.ZipFile(src, "r") as zf:
-                for n_member in zf.namelist():
-                    if n_member.startswith("contrib/"):
-                        contrib_members_all[n_member] = zf.read(n_member)
+        # Contributions are named by history index, and every single-run
+        # database numbers its history from zero -- so without renumbering the
+        # members collide and one run's coverage is read back under another
+        # run's test name.
+        contrib_members_all = renumber_contrib(per_source_contrib,
+                                               history_offsets)
+
+        # Annotational and measured members that must be combined rather than
+        # copied.  Dropping these (the previous behaviour) silently lost
+        # exclusions, waivers, tags, attributes and formal results.
+        merged_members: Dict[str, bytes] = dict(structural_members)
+        for name, payloads in annotational.items():
+            if not payloads:
+                continue
+            merged = _merge_annotational(name, payloads)
+            if merged:
+                merged_members[name] = merged
 
         counts_bytes  = CountsWriter().serialize(merged_counts)
         history_bytes = HistoryWriter().serialize(all_history)
@@ -159,6 +313,8 @@ class NcdbMerger:
             zf.writestr(MEMBER_COUNTS,     counts_bytes)
             zf.writestr(MEMBER_HISTORY,    history_bytes)
             zf.writestr(MEMBER_SOURCES,    sources_bytes)
+            for member_name in sorted(merged_members):
+                zf.writestr(member_name, merged_members[member_name])
             for member_name, member_bytes in contrib_members_all.items():
                 zf.writestr(member_name, member_bytes)
             for member_name, member_bytes in v2_members.items():
@@ -168,6 +324,34 @@ class NcdbMerger:
                 zf.writestr(MEMBER_TESTPLAN, testplan_bytes)
             if waivers_bytes:
                 zf.writestr(MEMBER_WAIVERS, waivers_bytes)
+
+    def _scan_sources(self, sources):
+        """One pass per source archive for everything but counts and history.
+
+        Returns ``(per_source_contrib, annotational, merge_ops_payloads)``.
+        Kept to a single ``ZipFile`` open per source: this runs on the fast
+        path, and re-opening each archive per member class showed up
+        immediately on a 1.2M-bin design.
+        """
+        per_source_contrib: List[Dict[str, bytes]] = []
+        annotational: Dict[str, List[bytes]] = {name: [] for name
+                                                in _ANNOTATIONAL_MEMBERS}
+        merge_ops_payloads: List[bytes] = []
+
+        for src in sources:
+            with zipfile.ZipFile(src, "r") as zf:
+                names = zf.namelist()
+                per_source_contrib.append({
+                    n_member: zf.read(n_member) for n_member in names
+                    if n_member.startswith("contrib/")
+                })
+                for name in _ANNOTATIONAL_MEMBERS:
+                    if name in names:
+                        annotational[name].append(zf.read(name))
+                if MEMBER_MERGE_OPS in names:
+                    merge_ops_payloads.append(zf.read(MEMBER_MERGE_OPS))
+
+        return per_source_contrib, annotational, merge_ops_payloads
 
     # ── Cross-schema fallback ─────────────────────────────────────────────
 

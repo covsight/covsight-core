@@ -19,6 +19,7 @@ extensions = [
     'sphinx.ext.autosectionlabel',
     'sphinx.ext.inheritance_diagram',
     'sphinx_js',
+    'hawkmoth',
 ]
 
 intersphinx_mapping = {
@@ -38,6 +39,20 @@ version = "0.0"
 autoclass_content = "both"
 autodoc_member_order = "bysource"
 autosectionlabel_prefix_document = True
+
+# Hawkmoth: the C++ reference in reference/cpp-api/ is extracted from the
+# writer's own headers, so the published API cannot drift from the shipped one.
+#
+# It reads cpp/ucis-xml/include/ucis_xml.hpp -- the generated single header that
+# consumers actually vendor, not the split sources -- so what is documented is
+# what is delivered. Only `/**` comments are extracted; internals use plain
+# `//` and stay out of the reference.
+hawkmoth_root = os.path.join(rootdir, 'cpp', 'ucis-xml', 'include')
+# Ask the local compiler where the standard headers are, rather than hardcoding
+# paths: libclang ships no builtin headers of its own, so without this every
+# `#include <cstdint>` fails and hawkmoth silently emits nothing.
+hawkmoth_compiler = 'g++'
+hawkmoth_clang_cpp = ['-std=c++17']
 
 # sphinx-js configuration
 js_language = 'typescript'

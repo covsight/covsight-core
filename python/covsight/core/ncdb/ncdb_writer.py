@@ -19,6 +19,7 @@ from .cross import CrossWriter
 from .contrib import ContribWriter
 from .formal import FormalWriter
 from .coveritem_flags import CoveritemFlagsWriter
+from .merge_ops import MergeOpsWriter, MEMBER_MERGE_OPS
 from .design_units import DesignUnitsWriter
 from .manifest import Manifest
 from .constants import (
@@ -87,9 +88,13 @@ class NcdbWriter:
         contrib_members = ContribWriter().serialize(db)
         formal_bytes  = FormalWriter().serialize(db)
         ci_flags_bytes = CoveritemFlagsWriter().serialize(db)
+        # Non-additive bins, so a merge can be type-aware without
+        # decoding the scope tree.  Empty for almost every design.
+        merge_ops_bytes = MergeOpsWriter().serialize(db)
 
         # 7. Manifest
-        manifest = Manifest.build(db, scope_tree_bytes, counts, all_nodes)
+        manifest = Manifest.build(db, scope_tree_bytes, counts, all_nodes,
+                                  strings_bytes)
 
         # Check for v2 binary history members (from NcdbUCIS.get_v2_members)
         v2_members = {}
@@ -129,6 +134,8 @@ class NcdbWriter:
                 zf.writestr(MEMBER_FORMAL, formal_bytes)
             if ci_flags_bytes:
                 zf.writestr(MEMBER_COVERITEM_FLAGS, ci_flags_bytes)
+            if merge_ops_bytes:
+                zf.writestr(MEMBER_MERGE_OPS, merge_ops_bytes)
             # v2 binary history members (stored uncompressed — pre-compressed)
             for member_name, member_bytes in v2_members.items():
                 zf.writestr(member_name, member_bytes,

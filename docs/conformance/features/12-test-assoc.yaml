@@ -1,0 +1,115 @@
+# UCIS conformance registry -- section 12: History-node lists / test↔coveritem association
+#
+# GENERATED SKELETON, HAND-MAINTAINED THEREAFTER.
+# Records intent only: what the backend is expected to do with each feature.
+# Status ("is it tested?", "is it documented?") is computed by
+# tools/gen_conformance_matrix.py and never written here.
+#
+# See docs/conformance/README.md.
+
+section:
+  number: 12
+  title: "History-node lists / test↔coveritem association"
+  spec_ref: "§ 8.17"
+
+features:
+  - id: HL.1
+    title: "`ucis_CreateHistoryNodeList(db)`"
+    spec_ref: "§ 8.17.2"
+    kind: feature
+    backends:
+      parquet:
+        scope: extended
+        reason: >
+          Per-test contribution. Optional provenance: the tiered
+          ALL/NEVER/SPARSE model exists precisely because many producers cannot
+          afford to record it. Coverage totals are complete without it.
+    notes: >
+      The list is how an association set is built and read back;
+      test_cover_assoc is where it lands.
+
+  - id: HL.2
+    title: "`ucis_FreeHistoryNodeList(db, list)`"
+    spec_ref: "§ 8.17.3"
+    kind: feature
+    backends:
+      parquet:
+        scope: out_of_scope
+        reason: >
+          Process-local handle lifetime. Nothing about it is persisted, so there
+          is nothing for the mapping to represent.
+
+  - id: HL.3
+    title: "`ucis_AddToHistoryNodeList(list, node)`"
+    spec_ref: "§ 8.17.4"
+    kind: feature
+    backends:
+      parquet:
+        scope: extended
+        reason: >
+          Per-test contribution. Optional provenance: the tiered
+          ALL/NEVER/SPARSE model exists precisely because many producers cannot
+          afford to record it. Coverage totals are complete without it.
+    notes: >
+      The list is how an association set is built and read back;
+      test_cover_assoc is where it lands.
+
+  - id: HL.4
+    title: "`ucis_RemoveFromHistoryNodeList(list, node)`"
+    spec_ref: "§ 8.17.5"
+    kind: feature
+    backends:
+      parquet:
+        scope: extended
+        reason: >
+          Per-test contribution. Optional provenance: the tiered
+          ALL/NEVER/SPARSE model exists precisely because many producers cannot
+          afford to record it. Coverage totals are complete without it.
+    notes: >
+      The list is how an association set is built and read back;
+      test_cover_assoc is where it lands.
+
+  - id: HL.5
+    title: "`ucis_HistoryNodeListIterate(db, list)`"
+    spec_ref: "§ 8.17.6"
+    kind: feature
+    backends:
+      parquet:
+        scope: extended
+        reason: >
+          Per-test contribution. Optional provenance: the tiered
+          ALL/NEVER/SPARSE model exists precisely because many producers cannot
+          afford to record it. Coverage totals are complete without it.
+    notes: >
+      The list is how an association set is built and read back;
+      test_cover_assoc is where it lands.
+
+  - id: HL.6
+    title: "`ucis_SetHistoryNodeListAssoc(db, list, obj, coverindex)`"
+    spec_ref: "§ 8.17.7"
+    kind: feature
+    backends:
+      parquet:
+        scope: extended
+        reason: >
+          Per-test contribution. Optional provenance: the tiered
+          ALL/NEVER/SPARSE model exists precisely because many producers cannot
+          afford to record it. Coverage totals are complete without it.
+    notes: >
+      Tiered: only SPARSE materializes rows, ALL/NEVER are a per-scope
+      covsight:assoc_tier property. See X.7.
+
+  - id: HL.7
+    title: "`ucis_GetHistoryNodeListAssoc(db, obj, coverindex)` → list"
+    spec_ref: "§ 8.17.8"
+    kind: feature
+    backends:
+      parquet:
+        scope: extended
+        reason: >
+          Per-test contribution. Optional provenance: the tiered
+          ALL/NEVER/SPARSE model exists precisely because many producers cannot
+          afford to record it. Coverage totals are complete without it.
+    notes: >
+      Tiered: only SPARSE materializes rows, ALL/NEVER are a per-scope
+      covsight:assoc_tier property. See X.7.
