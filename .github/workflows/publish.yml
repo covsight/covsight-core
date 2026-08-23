@@ -59,7 +59,15 @@ jobs:
         with:
           python-version: "3.11"
       - name: Install
-        run: pip install -e ".[dev]"
+        # Must match ci.yml's extras exactly. This job used to install only
+        # ".[dev]" while ci.yml installed ".[dev,validate]", so the release
+        # path ran a suite that ci.yml never ran: 21 tests died with
+        # "ImportError: jsonschema is required for validation". It went
+        # unnoticed until the first tag, because until then this workflow had
+        # never run at all. The publish jobs `needs` this one, so the effect
+        # was a release that could never happen rather than a bad release --
+        # but the two extras lists must not drift again.
+        run: pip install -e ".[dev,validate]"
       - name: Test
         run: pytest
 
