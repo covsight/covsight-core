@@ -121,7 +121,12 @@ jobs:
           ctest --test-dir c/build-asan --output-on-failure
       - name: ucis_writer examples validate against the UCIS XSD
         run: |
-          pip install xmlschema
+          # `.` is required, not incidental: the repo-root conftest.py sets
+          # pytest_plugins = ("covsight.core.conformance.marker",), which pytest
+          # imports before collection, so ANY pytest run from this root needs
+          # covsight importable or it dies with "Error importing plugin". No
+          # extras -- the plugin only needs pyyaml, which is a base dependency.
+          pip install xmlschema pytest .
           UCIS_WRITER_EXAMPLE_OUT=c/build/ucis-writer/examples/out \
             python3 -m pytest tests/ucis_writer -q
 
@@ -168,7 +173,12 @@ jobs:
       # every complex type ucis.xsd declares.
       - name: ucis_xml examples validate against the UCIS XSD
         run: |
-          pip install xmlschema pytest
+          # `.` is required, not incidental: the repo-root conftest.py sets
+          # pytest_plugins = ("covsight.core.conformance.marker",), which pytest
+          # imports before collection, so ANY pytest run from this root needs
+          # covsight importable or it dies with "Error importing plugin". No
+          # extras -- the plugin only needs pyyaml, which is a base dependency.
+          pip install xmlschema pytest .
           UCIS_XML_EXAMPLE_OUT=cpp/build/examples/out \
             python3 -m pytest tests/ucis_xml -q \
               --ignore=tests/ucis_xml/test_scale.py \
@@ -181,7 +191,8 @@ jobs:
       # edit.
       - name: C++ API reference still extracts
         run: |
-          pip install sphinx hawkmoth libclang
+          # `.` for the same reason as the step above.
+          pip install sphinx hawkmoth libclang .
           python3 -m pytest tests/ucis_xml/test_docs.py -q
       # L-3. A NOTICE file here would silently reintroduce the Apache-2.0 §4(d)
       # obligation that the Apache-2.0 OR MIT dual licence exists to avoid, so
