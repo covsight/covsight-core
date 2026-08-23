@@ -30,6 +30,13 @@ package:
       src: pypi
     - name: xmlschema
       src: pypi
+    # Needed by covsight.core.conformance.registry, which the repo-root
+    # conftest.py pulls in as a pytest plugin -- so it is required by any
+    # pytest run here, not just by the ones that import covsight directly. It
+    # arrives transitively today; declared explicitly so a transitive change
+    # cannot quietly take it away.
+    - name: pyyaml
+      src: pypi
     - name: node
       src: package.json
       path: ts/package.json

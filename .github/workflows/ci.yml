@@ -99,18 +99,25 @@ jobs:
       - uses: actions/checkout@v6
       - name: Fetch dependencies
       # ivpm creates a venv at packages/python and installs the pypi deps
-      # declared in ivpm.yaml into it. The project goes in editable on top --
-      # ivpm does not install the containing package itself, and the repo-root
-      # conftest.py sets pytest_plugins = ("covsight.core.conformance.marker",),
-      # which pytest imports before collection, so any pytest run from this root
-      # needs covsight importable or it dies with "Error importing plugin".
+      # declared in ivpm.yaml into it. Everything below runs out of that
+      # interpreter rather than the system one, so CI and a developer's
+      # `ivpm update` shell are the same environment and the dependency list
+      # has exactly one home: ivpm.yaml.
       #
-      # Everything below runs out of that interpreter rather than the system
-      # one, so CI and a developer's `ivpm update` shell are the same
-      # environment and the dependency list has exactly one home: ivpm.yaml.
-        run: |
-          pip install ivpm && ivpm update
-          packages/python/bin/pip install -e .
+      # covsight itself reaches that interpreter via PYTHONPATH=python on each
+      # pytest invocation, NOT by installing into the venv. It has to be
+      # importable at all because the repo-root conftest.py sets
+      # pytest_plugins = ("covsight.core.conformance.marker",), which pytest
+      # imports before collection -- without it every pytest run from this root
+      # dies with "Error importing plugin".
+      #
+      # Do not "simplify" this to `packages/python/bin/pip install -e .`. ivpm
+      # picks its venv backend with shutil.which("uv") (utils.py setup_venv,
+      # uv_pip="auto"), so on any machine that has uv the venv is built by uv
+      # and contains NO pip -- that line then fails with "No such file or
+      # directory". The package is pure Python under python/, so PYTHONPATH
+      # needs no installer of either kind and works on both paths.
+        run: pip install ivpm && ivpm update
       - name: Build
         run: cmake -S c -B c/build && cmake --build c/build
       - name: Test
@@ -133,7 +140,7 @@ jobs:
           ctest --test-dir c/build-asan --output-on-failure
       - name: ucis_writer examples validate against the UCIS XSD
         run: |
-          UCIS_WRITER_EXAMPLE_OUT=c/build/ucis-writer/examples/out \
+          PYTHONPATH=python UCIS_WRITER_EXAMPLE_OUT=c/build/ucis-writer/examples/out \
             packages/python/bin/python -m pytest tests/ucis_writer -q
 
   cpp:
@@ -147,18 +154,25 @@ jobs:
       # pytest, and both run it out of the ivpm venv.
       - name: Fetch dependencies
       # ivpm creates a venv at packages/python and installs the pypi deps
-      # declared in ivpm.yaml into it. The project goes in editable on top --
-      # ivpm does not install the containing package itself, and the repo-root
-      # conftest.py sets pytest_plugins = ("covsight.core.conformance.marker",),
-      # which pytest imports before collection, so any pytest run from this root
-      # needs covsight importable or it dies with "Error importing plugin".
+      # declared in ivpm.yaml into it. Everything below runs out of that
+      # interpreter rather than the system one, so CI and a developer's
+      # `ivpm update` shell are the same environment and the dependency list
+      # has exactly one home: ivpm.yaml.
       #
-      # Everything below runs out of that interpreter rather than the system
-      # one, so CI and a developer's `ivpm update` shell are the same
-      # environment and the dependency list has exactly one home: ivpm.yaml.
-        run: |
-          pip install ivpm && ivpm update
-          packages/python/bin/pip install -e .
+      # covsight itself reaches that interpreter via PYTHONPATH=python on each
+      # pytest invocation, NOT by installing into the venv. It has to be
+      # importable at all because the repo-root conftest.py sets
+      # pytest_plugins = ("covsight.core.conformance.marker",), which pytest
+      # imports before collection -- without it every pytest run from this root
+      # dies with "Error importing plugin".
+      #
+      # Do not "simplify" this to `packages/python/bin/pip install -e .`. ivpm
+      # picks its venv backend with shutil.which("uv") (utils.py setup_venv,
+      # uv_pip="auto"), so on any machine that has uv the venv is built by uv
+      # and contains NO pip -- that line then fails with "No such file or
+      # directory". The package is pure Python under python/, so PYTHONPATH
+      # needs no installer of either kind and works on both paths.
+        run: pip install ivpm && ivpm update
       - name: Build
         run: cmake -S cpp/ucis-xml -B cpp/build && cmake --build cpp/build -j
       - name: Test
@@ -195,7 +209,7 @@ jobs:
       # every complex type ucis.xsd declares.
       - name: ucis_xml examples validate against the UCIS XSD
         run: |
-          UCIS_XML_EXAMPLE_OUT=cpp/build/examples/out \
+          PYTHONPATH=python UCIS_XML_EXAMPLE_OUT=cpp/build/examples/out \
             packages/python/bin/python -m pytest tests/ucis_xml -q \
               --ignore=tests/ucis_xml/test_scale.py \
               --ignore=tests/ucis_xml/test_docs.py
@@ -208,7 +222,7 @@ jobs:
       - name: C++ API reference still extracts
         # sphinx, hawkmoth and libclang are ivpm.yaml deps, so they are
         # already in the venv from the fetch step.
-        run: packages/python/bin/python -m pytest tests/ucis_xml/test_docs.py -q
+        run: PYTHONPATH=python packages/python/bin/python -m pytest tests/ucis_xml/test_docs.py -q
       # L-3. A NOTICE file here would silently reintroduce the Apache-2.0 §4(d)
       # obligation that the Apache-2.0 OR MIT dual licence exists to avoid, so
       # adding one has to fail rather than pass unnoticed.
