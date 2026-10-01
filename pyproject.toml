@@ -37,6 +37,7 @@ duckdb = ["pyarrow>=14.0", "duckdb>=1.0"]
 ncdb = "covsight.core.ncdb.format_plugin:NcdbFormatPlugin"
 parquet = "covsight.core.parquet.format_plugin:ParquetFormatPlugin"
 xml = "covsight.core.xml.format_plugin:XmlFormatPlugin"
+vltcov = "covsight.core.vltcov.format_plugin:VltcovFormatPlugin"
 
 [tool.setuptools.packages.find]
 where = ["python"]

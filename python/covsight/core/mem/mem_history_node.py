@@ -83,10 +83,16 @@ class MemHistoryNode(HistoryNode):
     
     def getLogicalName(self)->str:
         return self.m_logicalname
-    
+
+    def setLogicalName(self, name : str):
+        self.m_logicalname = name
+
     def getPhysicalName(self)->str:
         return self.m_physicalname
-    
+
+    def setPhysicalName(self, name : str):
+        self.m_physicalname = name
+
     def getKind(self)->str:
         return self.m_kind
     
