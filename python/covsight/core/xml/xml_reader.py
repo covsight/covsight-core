@@ -66,7 +66,9 @@ UCIS_IGNOREBIN      = CoverTypeT.IGNOREBIN
 UCIS_ILLEGALBIN     = CoverTypeT.ILLEGALBIN
 UCIS_OTHER          = SourceT.OTHER
 UCIS_VLOG           = SourceT.VLOG
-
+def _local(tag):
+    """Element tag without its namespace."""
+    return tag.split("}")[-1] if "}" in tag else tag
 
 class XmlReader():
     
@@ -261,24 +263,26 @@ class XmlReader():
                     break
             toggle_scope = inst_scope.createScope(
                 name, srcinfo, 1, UCIS_VLOG, ScopeTypeT.TOGGLE, UCIS_ENABLED_TOGGLE)
-            for tb_elem in to_elem:
-                tb_local = tb_elem.tag.split("}")[-1] if "}" in tb_elem.tag else tb_elem.tag
-                if tb_local != "toggleBit":
-                    continue
+            bits = [e for e in to_elem if _local(e.tag) == "toggleBit"]
+            for tb_elem in bits:
+                # Canonical toggle bin names: "0->1" for a scalar, "<bit>:0->1"
+                # for one bit of a vector (as the Verilator importer writes).
+                prefix = ""
+                if len(bits) > 1:
+                    idx = [e.text.strip() for e in tb_elem
+                           if _local(e.tag) == "index" and e.text]
+                    prefix = (",".join(idx) or tb_elem.get("name", "")) + ":"
                 for toggle_elem in tb_elem:
-                    tg_local = toggle_elem.tag.split("}")[-1] if "}" in toggle_elem.tag else toggle_elem.tag
-                    if tg_local != "toggle":
+                    if _local(toggle_elem.tag) != "toggle":
                         continue
                     from_val = toggle_elem.get("from", "0")
                     to_val = toggle_elem.get("to", "1")
-                    bin_name = from_val + "to" + to_val
+                    bin_name = "%s%s->%s" % (prefix, from_val, to_val)
                     count = 0
                     for bin_elem in toggle_elem:
-                        b_local = bin_elem.tag.split("}")[-1] if "}" in bin_elem.tag else bin_elem.tag
-                        if b_local == "bin":
+                        if _local(bin_elem.tag) == "bin":
                             for c_elem in bin_elem:
-                                c_local = c_elem.tag.split("}")[-1] if "}" in c_elem.tag else c_elem.tag
-                                if c_local == "contents":
+                                if _local(c_elem.tag) == "contents":
                                     count = int(c_elem.get("coverageCount", "0"))
                     cd = CoverData(CoverTypeT.TOGGLEBIN, 0)
                     cd.data = count
