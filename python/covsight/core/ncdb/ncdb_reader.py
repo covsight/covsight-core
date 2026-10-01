@@ -20,6 +20,7 @@ from .cross import CrossReader
 from .contrib import ContribReader
 from .formal import FormalReader
 from .coveritem_flags import CoveritemFlagsReader
+from .coveritem_sources import CoveritemSourcesReader
 from .design_units import DesignUnitsReader
 from .manifest import Manifest
 from .constants import (
@@ -28,7 +29,7 @@ from .constants import (
     MEMBER_ATTRS, MEMBER_TAGS, MEMBER_PROPERTIES, MEMBER_TOGGLE, MEMBER_FSM,
     MEMBER_CROSS, MEMBER_DESIGN_UNITS, MEMBER_CONTRIB_DIR, MEMBER_FORMAL,
     NCDB_FORMAT,
-    MEMBER_COVERITEM_FLAGS,
+    MEMBER_COVERITEM_FLAGS, MEMBER_COVERITEM_SOURCES,
     MEMBER_TEST_REGISTRY, MEMBER_TEST_STATS,
     MEMBER_BUCKET_INDEX, MEMBER_CONTRIB_INDEX, MEMBER_SQUASH_LOG,
     HISTORY_BUCKET_DIR, HISTORY_FORMAT_V2,
@@ -171,6 +172,8 @@ class NcdbReader:
             FormalReader().apply(db, formal_bytes)
         if ci_flags_bytes:
             CoveritemFlagsReader().deserialize(ci_flags_bytes, db)
+        CoveritemSourcesReader().apply(
+            db, zf_data.get(MEMBER_COVERITEM_SOURCES, b''), file_handles)
 
         # Register source files as file handles in db
         for fh in file_handles:

@@ -144,3 +144,4 @@ SCOPE_TO_COVER_TYPE: dict = {
     ScopeTypeT.ASSERT:     CoverTypeT.ASSERTBIN,
 }
 MEMBER_COVERITEM_FLAGS = "coveritem_flags.bin"
+MEMBER_COVERITEM_SOURCES = "coveritem_sources.bin"

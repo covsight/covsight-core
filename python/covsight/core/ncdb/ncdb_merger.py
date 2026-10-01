@@ -52,7 +52,7 @@ from covsight.core.ncdb._accel import add_uint32_arrays as _add_arrays, HAS_ACCE
 from .constants import (
     MEMBER_ATTRS, MEMBER_TAGS, MEMBER_TOGGLE, MEMBER_FSM, MEMBER_CROSS,
     MEMBER_FORMAL, MEMBER_DESIGN_UNITS, MEMBER_PROPERTIES,
-    MEMBER_COVERITEM_FLAGS,
+    MEMBER_COVERITEM_FLAGS, MEMBER_COVERITEM_SOURCES,
     MEMBER_ISSUES, MEMBER_ISSUES_META, MEMBER_ISSUES_HISTORY,
 )
 from .member_merge import (
@@ -72,7 +72,7 @@ from covsight.core.mem.mem_history_node import MemHistoryNode
 #: identical across sources and are copied from the first one.
 _STRUCTURAL_MEMBERS = frozenset({
     MEMBER_TOGGLE, MEMBER_FSM, MEMBER_CROSS, MEMBER_DESIGN_UNITS,
-    MEMBER_PROPERTIES, MEMBER_MERGE_OPS,
+    MEMBER_PROPERTIES, MEMBER_MERGE_OPS, MEMBER_COVERITEM_SOURCES,
     MEMBER_ISSUES, MEMBER_ISSUES_META, MEMBER_ISSUES_HISTORY,
 })
 

@@ -81,6 +81,11 @@ optional (O).
    * - ``coveritem_flags.bin``
      - O
      - Per-cover-item flag overrides.
+   * - ``coveritem_sources.bin``
+     - O
+     - Per-cover-item source locations (file, line, column), sparse and keyed
+       by cover-item DFS index; file ids index ``sources.json``.  Needed for
+       line-level code-coverage views (per-file reports, LCOV).
    * - ``design_units.json``
      - O
      - Design-unit index for instance-to-DU resolution.

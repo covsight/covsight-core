@@ -26,6 +26,9 @@ class MemCoverIndex(CoverIndex):
     
     def getSourceInfo(self)->SourceInfo:
         return self.srcinfo
+
+    def setSourceInfo(self, srcinfo: SourceInfo):
+        self.srcinfo = srcinfo
     
     def incrementCover(self, amt=1):
         self.data.data += amt

@@ -19,6 +19,7 @@ from .cross import CrossWriter
 from .contrib import ContribWriter
 from .formal import FormalWriter
 from .coveritem_flags import CoveritemFlagsWriter
+from .coveritem_sources import CoveritemSourcesWriter
 from .merge_ops import MergeOpsWriter, MEMBER_MERGE_OPS
 from .design_units import DesignUnitsWriter
 from .manifest import Manifest
@@ -27,7 +28,7 @@ from .constants import (
     MEMBER_COUNTS, MEMBER_HISTORY, MEMBER_SOURCES,
     MEMBER_ATTRS, MEMBER_TAGS, MEMBER_PROPERTIES, MEMBER_TOGGLE, MEMBER_FSM,
     MEMBER_CROSS, MEMBER_DESIGN_UNITS, MEMBER_FORMAL,
-    MEMBER_COVERITEM_FLAGS, MEMBER_TESTPLAN, MEMBER_WAIVERS,
+    MEMBER_COVERITEM_FLAGS, MEMBER_COVERITEM_SOURCES, MEMBER_TESTPLAN, MEMBER_WAIVERS,
     MEMBER_ISSUES, MEMBER_ISSUES_META, MEMBER_ISSUES_HISTORY,
     HISTORY_FORMAT_V2,
 )
@@ -47,6 +48,10 @@ class NcdbWriter:
         st_writer = ScopeTreeWriter(string_table, file_handles)
         scope_tree_bytes = st_writer.write(db)
         counts = st_writer.counts_list
+        # Item source locations share the scope tree's file table, so this
+        # must run before the sources member is serialized.
+        ci_sources_bytes = CoveritemSourcesWriter(
+            st_writer._get_file_id).serialize(db)
 
         # 2. Serialize counts
         counts_bytes = CountsWriter().serialize(counts)
@@ -136,6 +141,8 @@ class NcdbWriter:
                 zf.writestr(MEMBER_COVERITEM_FLAGS, ci_flags_bytes)
             if merge_ops_bytes:
                 zf.writestr(MEMBER_MERGE_OPS, merge_ops_bytes)
+            if ci_sources_bytes:
+                zf.writestr(MEMBER_COVERITEM_SOURCES, ci_sources_bytes)
             # v2 binary history members (stored uncompressed — pre-compressed)
             for member_name, member_bytes in v2_members.items():
                 zf.writestr(member_name, member_bytes,
