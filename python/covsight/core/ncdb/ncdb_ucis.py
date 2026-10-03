@@ -23,6 +23,7 @@ Binary history v2 usage::
     print(entry.flake_score)
 """
 
+import os
 import time
 import zipfile
 import json
@@ -71,6 +72,12 @@ class NcdbUCIS(MemUCIS):
         self._loaded_v2_history = False
         self._du_index: dict = {}   # name → DU scope (populated after _ensure_scopes)
         self._zf_cache: dict = {}   # member name → bytes (populated on first open)
+
+        # No file yet (format create(), or a path not written yet): start as
+        # an empty database rather than reading a ZIP that does not exist.
+        if path is None or not os.path.isfile(path):
+            self._loaded_history = True
+            self._loaded_scopes = True
 
         # Binary history v2 state (None until _ensure_v2_history() is called)
         self._test_registry = None
@@ -520,6 +527,8 @@ class NcdbUCIS(MemUCIS):
     def _read_zip(self) -> None:
         """Read all ZIP members into the byte cache (called at most once)."""
         if self._zf_cache:
+            return
+        if self._ncdb_path is None or not os.path.isfile(self._ncdb_path):
             return
         with zipfile.ZipFile(self._ncdb_path, "r") as zf:
             names = zf.namelist()

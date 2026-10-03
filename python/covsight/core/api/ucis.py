@@ -108,7 +108,7 @@ class UCIS(Scope):
         See Also:
             Obj.getIntProperty(): Base implementation
             IntProperty: Database-specific properties include IS_MODIFIED,
-                MODIFIED_SINCE_SIM, NUM_TESTS
+            MODIFIED_SINCE_SIM, NUM_TESTS
         """
         if property == IntProperty.IS_MODIFIED:
             return 1 if self.isModified() else 0

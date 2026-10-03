@@ -36,7 +36,8 @@ class CovScope(Scope):
     as a structural marker in the type hierarchy to distinguish coverage
     scopes from non-coverage scopes (like pure structural scopes).
     
-    Subclass hierarchy:
+    Subclass hierarchy::
+
         Scope
         └── CovScope (this class)
             ├── FuncCovScope (functional coverage)
