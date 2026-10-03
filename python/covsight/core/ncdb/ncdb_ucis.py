@@ -37,7 +37,7 @@ from .constants import (
     MEMBER_COUNTS, MEMBER_HISTORY, MEMBER_SOURCES,
     MEMBER_ATTRS, MEMBER_TAGS, MEMBER_PROPERTIES,
     MEMBER_TOGGLE, MEMBER_FSM, MEMBER_CROSS, MEMBER_DESIGN_UNITS,
-    MEMBER_CONTRIB_DIR, MEMBER_FORMAL, MEMBER_COVERITEM_SOURCES,
+    MEMBER_CONTRIB_DIR, MEMBER_FORMAL, MEMBER_COVERITEM_SOURCES, MEMBER_COVERITEM_TYPES,
     MEMBER_TEST_REGISTRY, MEMBER_TEST_STATS,
     MEMBER_BUCKET_INDEX, MEMBER_CONTRIB_INDEX, MEMBER_SQUASH_LOG,
     HISTORY_BUCKET_DIR, HISTORY_FORMAT_V2,
@@ -601,6 +601,9 @@ class NcdbUCIS(MemUCIS):
             CrossReader().apply(self, cross_data)
         from .design_units import DesignUnitsReader
         self._du_index = DesignUnitsReader().build_index(du_data, self)
+        DesignUnitsReader().link_instances(du_data, self)
+        from .coveritem_types import CoveritemTypesReader
+        CoveritemTypesReader().apply(self, data.get(MEMBER_COVERITEM_TYPES, b''))
         from .coveritem_sources import CoveritemSourcesReader
         CoveritemSourcesReader().apply(
             self, data.get(MEMBER_COVERITEM_SOURCES, b''), file_handles)

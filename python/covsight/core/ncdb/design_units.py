@@ -8,9 +8,15 @@ Format:
   {"version": 1, "units": [
     {"name": "<str>", "idx": <int>, "type": <int>},
     ...
-  ]}
+  ], "instances": [[<instance idx>, <DU idx>], ...]}
 
 Only DU_ANY scopes are included.  *idx* is the DFS index from dfs_scope_list().
+
+``instances`` (optional) links each INSTANCE scope to its design unit.
+scope_tree.bin does not record an instance's DU, and without this list a
+reader can only guess a sibling DU with the instance's own name -- right for
+``top`` (module ``top``), wrong for ``u_fifo`` (module ``fifo``).  Readers
+that predate the key ignore it.
 """
 
 import json
@@ -27,9 +33,12 @@ class DesignUnitsWriter:
 
     def serialize(self, db) -> bytes:
         units = []
-        for idx, scope in enumerate(dfs_scope_list(db)):
+        scopes = dfs_scope_list(db)
+        du_idx = {}
+        for idx, scope in enumerate(scopes):
             scope_type = scope.getScopeType()
             if ScopeTypeT.DU_ANY(scope_type):
+                du_idx[id(scope)] = idx
                 units.append({
                     "name": scope.getScopeName(),
                     "idx":  idx,
@@ -37,12 +46,35 @@ class DesignUnitsWriter:
                 })
         if not units:
             return b""
+        instances = []
+        for idx, scope in enumerate(scopes):
+            if scope.getScopeType() == ScopeTypeT.INSTANCE:
+                du = scope.getInstanceDu() if hasattr(scope, "getInstanceDu") else None
+                if du is not None and id(du) in du_idx:
+                    instances.append([idx, du_idx[id(du)]])
         payload = {"version": _VERSION, "units": units}
+        if instances:
+            payload["instances"] = instances
         return json.dumps(payload, separators=(',', ':')).encode()
 
 
 class DesignUnitsReader:
     """Deserialize design_units.json and build a name → scope lookup."""
+
+    def link_instances(self, data: bytes, db) -> None:
+        """Point each INSTANCE scope at the DU the ``instances`` list names."""
+        if not data:
+            return
+        payload = json.loads(data.decode())
+        pairs = payload.get("instances") if payload.get("version") == _VERSION else None
+        if not pairs:
+            return
+        scopes = dfs_scope_list(db)
+        for inst_idx, du_idx in pairs:
+            if inst_idx < len(scopes) and du_idx < len(scopes):
+                inst = scopes[inst_idx]
+                if hasattr(inst, "m_du_scope"):
+                    inst.m_du_scope = scopes[du_idx]
 
     def build_index(self, data: bytes, db) -> dict:
         """Return a {name: scope} dict from design_units.json *data*.

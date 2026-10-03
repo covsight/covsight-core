@@ -21,6 +21,7 @@ from .contrib import ContribReader
 from .formal import FormalReader
 from .coveritem_flags import CoveritemFlagsReader
 from .coveritem_sources import CoveritemSourcesReader
+from .coveritem_types import CoveritemTypesReader
 from .design_units import DesignUnitsReader
 from .manifest import Manifest
 from .constants import (
@@ -29,7 +30,7 @@ from .constants import (
     MEMBER_ATTRS, MEMBER_TAGS, MEMBER_PROPERTIES, MEMBER_TOGGLE, MEMBER_FSM,
     MEMBER_CROSS, MEMBER_DESIGN_UNITS, MEMBER_CONTRIB_DIR, MEMBER_FORMAL,
     NCDB_FORMAT,
-    MEMBER_COVERITEM_FLAGS, MEMBER_COVERITEM_SOURCES,
+    MEMBER_COVERITEM_FLAGS, MEMBER_COVERITEM_SOURCES, MEMBER_COVERITEM_TYPES,
     MEMBER_TEST_REGISTRY, MEMBER_TEST_STATS,
     MEMBER_BUCKET_INDEX, MEMBER_CONTRIB_INDEX, MEMBER_SQUASH_LOG,
     HISTORY_BUCKET_DIR, HISTORY_FORMAT_V2,
@@ -163,6 +164,7 @@ class NcdbReader:
 
         # Build design-unit index (available via db._du_index after this)
         db._du_index = DesignUnitsReader().build_index(du_bytes, db)
+        DesignUnitsReader().link_instances(du_bytes, db)
 
         # Per-test contributions (optional)
         ContribReader().apply(db, contrib_members)
@@ -170,6 +172,9 @@ class NcdbReader:
         # Formal verification data (optional)
         if formal_bytes:
             FormalReader().apply(db, formal_bytes)
+        # Types first: flag defaults depend on each item's cover type.
+        CoveritemTypesReader().apply(
+            db, zf_data.get(MEMBER_COVERITEM_TYPES, b''))
         if ci_flags_bytes:
             CoveritemFlagsReader().deserialize(ci_flags_bytes, db)
         CoveritemSourcesReader().apply(

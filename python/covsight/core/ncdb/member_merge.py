@@ -7,7 +7,7 @@ be merged *in their serialized form*, which is what this module does.
 Members fall into three groups:
 
 **Structural** (``scope_tree``, ``strings``, ``sources``, ``toggle``, ``fsm``,
-``cross``, ``design_units``, ``properties``, ``coveritem_sources``) describe the
+``cross``, ``design_units``, ``properties``, ``coveritem_sources``, ``coveritem_types``) describe the
 shape of the design.
 The same-schema path is entered only when every source shares a
 ``schema_hash``, so these are identical by construction and are copied from the

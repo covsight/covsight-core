@@ -20,6 +20,7 @@ from .contrib import ContribWriter
 from .formal import FormalWriter
 from .coveritem_flags import CoveritemFlagsWriter
 from .coveritem_sources import CoveritemSourcesWriter
+from .coveritem_types import CoveritemTypesWriter
 from .merge_ops import MergeOpsWriter, MEMBER_MERGE_OPS
 from .design_units import DesignUnitsWriter
 from .manifest import Manifest
@@ -28,7 +29,7 @@ from .constants import (
     MEMBER_COUNTS, MEMBER_HISTORY, MEMBER_SOURCES,
     MEMBER_ATTRS, MEMBER_TAGS, MEMBER_PROPERTIES, MEMBER_TOGGLE, MEMBER_FSM,
     MEMBER_CROSS, MEMBER_DESIGN_UNITS, MEMBER_FORMAL,
-    MEMBER_COVERITEM_FLAGS, MEMBER_COVERITEM_SOURCES, MEMBER_TESTPLAN, MEMBER_WAIVERS,
+    MEMBER_COVERITEM_FLAGS, MEMBER_COVERITEM_SOURCES, MEMBER_COVERITEM_TYPES, MEMBER_TESTPLAN, MEMBER_WAIVERS,
     MEMBER_ISSUES, MEMBER_ISSUES_META, MEMBER_ISSUES_HISTORY,
     HISTORY_FORMAT_V2,
 )
@@ -52,6 +53,7 @@ class NcdbWriter:
         # must run before the sources member is serialized.
         ci_sources_bytes = CoveritemSourcesWriter(
             st_writer._get_file_id).serialize(db)
+        ci_types_bytes = CoveritemTypesWriter().serialize(db)
 
         # 2. Serialize counts
         counts_bytes = CountsWriter().serialize(counts)
@@ -143,6 +145,8 @@ class NcdbWriter:
                 zf.writestr(MEMBER_MERGE_OPS, merge_ops_bytes)
             if ci_sources_bytes:
                 zf.writestr(MEMBER_COVERITEM_SOURCES, ci_sources_bytes)
+            if ci_types_bytes:
+                zf.writestr(MEMBER_COVERITEM_TYPES, ci_types_bytes)
             # v2 binary history members (stored uncompressed — pre-compressed)
             for member_name, member_bytes in v2_members.items():
                 zf.writestr(member_name, member_bytes,

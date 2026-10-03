@@ -86,9 +86,16 @@ optional (O).
      - Per-cover-item source locations (file, line, column), sparse and keyed
        by cover-item DFS index; file ids index ``sources.json``.  Needed for
        line-level code-coverage views (per-file reports, LCOV).
+   * - ``coveritem_types.bin``
+     - O
+     - Per-cover-item cover type, ``at_least`` and goal, where they differ
+       from the scope tree's (one type and ``at_least`` per scope, taken from
+       its first item; goal 0).  Run-length encoded and keyed by cover-item
+       DFS index.  Keeps ignore, illegal and default bins typed under a
+       coverpoint.
    * - ``design_units.json``
      - O
-     - Design-unit index for instance-to-DU resolution.
+     - Design-unit index, and the design unit of each instance.
    * - ``contrib/``
      - O
      - Directory of per-test contribution records (one file per test).
@@ -374,15 +381,22 @@ File IDs are zero-based array indices into this list.
 design_units.json
 =================
 
-A JSON object mapping design-unit names to scope-path strings.  Used during
-reading to resolve ``INSTANCE`` scope DU references:
+An index of the design-unit scopes, and the design unit of each
+``INSTANCE`` scope.  Indices are DFS scope indices (the order of
+``scope_tree.bin``):
 
 .. code-block:: json
 
    {
-     "top":  "top",
-     "uart": "top.uart"
+     "version": 1,
+     "units": [{"name": "top", "idx": 0, "type": 16777216},
+               {"name": "fifo", "idx": 1, "type": 16777216}],
+     "instances": [[2, 0], [3, 1]]
    }
+
+``scope_tree.bin`` does not record an instance's design unit.  ``instances``
+(optional) supplies it; without it a reader links an instance to a sibling
+design unit with the instance's own name, when there is one.
 
 -----
 

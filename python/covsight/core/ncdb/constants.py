@@ -145,3 +145,4 @@ SCOPE_TO_COVER_TYPE: dict = {
 }
 MEMBER_COVERITEM_FLAGS = "coveritem_flags.bin"
 MEMBER_COVERITEM_SOURCES = "coveritem_sources.bin"
+MEMBER_COVERITEM_TYPES = "coveritem_types.bin"
