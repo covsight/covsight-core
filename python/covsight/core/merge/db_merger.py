@@ -3,89 +3,216 @@ Created on Jan 5, 2021
 
 @author: mballance
 '''
-from typing import Dict, List
+import copy
+from collections import OrderedDict
+from typing import Dict, List, Optional
 
-from covsight.core.api import CoverData
 from covsight.core.api import CoverTypeT
-from covsight.core.api import FlagsT
 from covsight.core.api import HistoryNodeKind
 from covsight.core.api import ScopeTypeT
+from covsight.core.api import SourceInfo
 from covsight.core.api import SourceT
 from covsight.core.api import UCIS
 
+_ALL = 0xFFFFFFFFFFFFFFFF
+
+#: Covergroup options copied from the first source (getter, setter).
+_CVG_OPTIONS = (
+    ("getAtLeast", "setAtLeast"), ("getAutoBinMax", "setAutoBinMax"),
+    ("getPerInstance", "setPerInstance"),
+    ("getMergeInstances", "setMergeInstances"),
+    ("getDetectOverlap", "setDetectOverlap"), ("getStrobe", "setStrobe"),
+    ("getComment", "setComment"),
+)
+
+#: Toggle-scope metadata copied from the first source.
+_TOGGLE_META = (
+    ("getCanonicalName", "setCanonicalName"),
+    ("getToggleMetric", "setToggleMetric"), ("getToggleType", "setToggleType"),
+    ("getToggleDir", "setToggleDir"), ("getNumBits", "setNumBits"),
+)
+
 
 class DbMerger(object):
-    
+    """Merge UCIS databases into one: the structural union of their scope
+    trees, with the hit counts of matching cover items summed.
+
+    Scopes match by (type, name) under matching parents, and cover items by
+    (name, cover type) within matching scopes; a name repeated under one
+    parent matches by occurrence.  Everything else -- flags, source
+    locations, weights, goals, at_least, attributes, tags, covergroup options,
+    toggle metadata -- comes from the first source that has the scope or item.
+    Every scope and cover-item type is merged; none is special-cased away.
+    """
+
     def __init__(self):
         self.dst_db = None
 
-    def merge(self, dst_db, src_db_l : List[UCIS]):
-        # There are three possible actions for each instance scope
-        # in the two databases:
-        # - Only exists in DB1 -> Copy from DB1
-        # - Only exists in DB2 -> Copy from DB2
-        # - Exists in both -> Copy from one (DB1?) and merge
-        
+    def merge(self, dst_db, src_db_l: List[UCIS]):
         self.dst_db = dst_db
-        
-        self._merge_instances_under(dst_db, src_db_l, dst_db)
+        self._du_m: Dict[int, object] = {}       # id(src DU) -> dst DU
+        self._du_name_m: Dict[tuple, object] = {}  # (type, name) -> dst DU
+        self._merge_children(dst_db, list(src_db_l))
         self._merge_history_nodes(dst_db, src_db_l)
 
-    def _merge_instances_under(self, dst_parent, src_parents, dst_root):
-        """Merge all INSTANCE scopes that are immediate children of each parent.
+    # ------------------------------------------------------------------
+    # Scopes
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _group(items, key):
+        """``OrderedDict`` of key -> [obj per source]; the n-th repeat of a
+        key within one source pairs with the n-th repeat in the others."""
+        groups: Dict[tuple, List] = OrderedDict()
+        for i, objs in enumerate(items):
+            seen: Dict[tuple, int] = {}
+            for obj in objs:
+                k = key(obj)
+                n = seen.get(k, 0)
+                seen[k] = n + 1
+                groups.setdefault(k + (n,), [None] * len(items))[i] = obj
+        return groups
 
-        *dst_parent* is either the destination db (top level) or a destination
-        INSTANCE scope (recursive call for nested instances).
-        *src_parents* is a list of source containers (db or INSTANCE scopes)
-        aligned by database index — a None means that database has no matching
-        parent at this level.
-        *dst_root* is the top-level destination db, used for history merging
-        only at the outermost call.
-        """
-        iscope_m : Dict[str, List[object]] = {}
-        iscope_name_l = []
+    def _merge_children(self, dst_parent, src_parents):
+        children = [list(p.scopes(ScopeTypeT.ALL)) if p is not None else []
+                    for p in src_parents]
+        groups = self._group(
+            children, lambda s: (int(s.getScopeType()), s.getScopeName()))
 
-        for i, parent in enumerate(src_parents):
-            if parent is None:
+        # Design units first: instances refer to them.
+        order = sorted(groups.items(),
+                       key=lambda kv: not ScopeTypeT.DU_ANY(ScopeTypeT(kv[0][0])))
+        coverpoints: Dict[str, object] = {}
+        for (stype, name, _), srcs in order:
+            stype = ScopeTypeT(stype)
+            src0 = next(s for s in srcs if s is not None)
+            dst = self._create_scope(dst_parent, src0, stype, coverpoints)
+            if stype == ScopeTypeT.COVERPOINT:
+                coverpoints[name] = dst
+            if ScopeTypeT.DU_ANY(stype):
+                for s in srcs:
+                    if s is not None:
+                        self._du_m[id(s)] = dst
+                self._du_name_m[(int(stype), name)] = dst
+            self._copy_scope_data(dst, srcs)
+            self._merge_items(dst, srcs)
+            self._merge_children(dst, srcs)
+            if stype == ScopeTypeT.FSM and hasattr(dst, "_states"):
+                from covsight.core.ncdb.fsm import FsmReader
+                FsmReader()._rebuild(dst, {})
+
+    def _create_scope(self, dst_parent, src, stype, coverpoints):
+        name = src.getScopeName()
+        srcinfo = self._srcinfo(src.getSourceInfo())
+        weight = src.getWeight() if hasattr(src, "getWeight") else 1
+        source = self._source_type(src)
+        flags = getattr(src, "m_flags", 0) or 0
+
+        if stype == ScopeTypeT.INSTANCE:
+            return dst_parent.createInstance(
+                name, srcinfo, weight, source, stype,
+                self._dst_du(src.getInstanceDu()), flags)
+        if stype == ScopeTypeT.CROSS:
+            points = []
+            for i in range(src.getNumCrossedCoverpoints()):
+                cp_name = src.getIthCrossedCoverpoint(i).getScopeName()
+                if cp_name not in coverpoints:
+                    raise Exception("Cannot find coverpoint %s when creating cross %s" % (
+                        cp_name, name))
+                points.append(coverpoints[cp_name])
+            return dst_parent.createCross(name, srcinfo, weight, source, points)
+        if stype == ScopeTypeT.COVERGROUP and hasattr(dst_parent, "createCovergroup"):
+            return dst_parent.createCovergroup(name, srcinfo, weight, source)
+        if stype == ScopeTypeT.COVERPOINT and hasattr(dst_parent, "createCoverpoint"):
+            return dst_parent.createCoverpoint(name, srcinfo, weight, source)
+        if stype == ScopeTypeT.COVERINSTANCE and hasattr(dst_parent, "createCoverInstance"):
+            return dst_parent.createCoverInstance(name, srcinfo, weight, source)
+        return dst_parent.createScope(name, srcinfo, weight, source, stype, flags)
+
+    def _dst_du(self, src_du):
+        if src_du is None:
+            return None
+        dst = self._du_m.get(id(src_du))
+        if dst is None:
+            key = (int(src_du.getScopeType()), src_du.getScopeName())
+            dst = self._du_name_m.get(key)
+        if dst is None:
+            # The DU is not in the source's tree (a detached placeholder):
+            # give it a home at the top level.
+            dst = self.dst_db.createScope(
+                src_du.getScopeName(), self._srcinfo(src_du.getSourceInfo()),
+                src_du.getWeight(), self._source_type(src_du),
+                src_du.getScopeType(), getattr(src_du, "m_flags", 0) or 0)
+            self._du_m[id(src_du)] = dst
+            self._du_name_m[(int(src_du.getScopeType()), src_du.getScopeName())] = dst
+        return dst
+
+    @staticmethod
+    def _source_type(scope):
+        st = getattr(scope, "m_source", None)
+        return st if st is not None else SourceT.NONE
+
+    def _copy_scope_data(self, dst, srcs):
+        src0 = next(s for s in srcs if s is not None)
+        if hasattr(src0, "getGoal") and hasattr(dst, "setGoal"):
+            goal = src0.getGoal()
+            if goal is not None and goal != -1:
+                dst.setGoal(goal)
+        for getter, setter in _CVG_OPTIONS + _TOGGLE_META:
+            if hasattr(src0, getter) and hasattr(dst, setter):
+                value = getattr(src0, getter)()
+                if value is not None:
+                    getattr(dst, setter)(value)
+        if hasattr(dst, "setAttribute"):
+            for s in reversed([s for s in srcs if s is not None]):
+                if hasattr(s, "getAttributes"):
+                    for k, v in s.getAttributes().items():
+                        dst.setAttribute(k, v)
+        if hasattr(dst, "addTag"):
+            for s in srcs:
+                if s is not None and hasattr(s, "getTags"):
+                    for t in s.getTags():
+                        dst.addTag(t)
+
+    # ------------------------------------------------------------------
+    # Cover items
+    # ------------------------------------------------------------------
+    def _merge_items(self, dst, srcs):
+        items = [list(s.coverItems(_ALL)) if s is not None else [] for s in srcs]
+        if not any(items):
+            return
+        groups = self._group(
+            items, lambda ci: (ci.getName(), int(ci.getCoverData().type)))
+        merged = []
+        for (name, _, _), cis in groups.items():
+            present = [ci for ci in cis if ci is not None]
+            cd = copy.copy(present[0].getCoverData())
+            cd.data = sum(ci.getCoverData().data for ci in present)
+            srcinfo = next((ci.getSourceInfo() for ci in present
+                            if ci.getSourceInfo() is not None), None)
+            dst.createNextCover(name, cd, self._srcinfo(srcinfo))
+            merged.append(present)
+
+        # createNextCover returns an index or an item depending on the scope
+        # class, so pick the new items up by position.
+        created = list(dst.coverItems(_ALL))[-len(merged):]
+        for dst_ci, present in zip(created, merged):
+            if not hasattr(dst_ci, "setAttribute"):
                 continue
-            for src_iscope in parent.scopes(ScopeTypeT.INSTANCE):
-                name = src_iscope.getScopeName()
-                if name not in iscope_m:
-                    scope_l = [None] * len(src_parents)
-                    iscope_m[name] = scope_l
-                    iscope_name_l.append(name)
-                iscope_m[name][i] = src_iscope
+            for ci in reversed(present):
+                if hasattr(ci, "getAttributes"):
+                    for k, v in ci.getAttributes().items():
+                        dst_ci.setAttribute(k, v)
 
-        for name in iscope_name_l:
-            src_scopes = list(filter(lambda e: e is not None, iscope_m[name]))
-            src_iscope = src_scopes[0]
+    def _srcinfo(self, si) -> Optional[SourceInfo]:
+        """``si`` with its file handle moved into the destination database."""
+        if si is None or si.file is None:
+            return si
+        fh = self.dst_db.createFileHandle(si.file.getFileName(), None)
+        return SourceInfo(fh, si.line, si.token)
 
-            src_du = src_iscope.getInstanceDu()
-            dst_du = dst_parent.createScope(
-                src_du.getScopeName(),
-                src_du.getSourceInfo(),
-                src_du.getWeight(),
-                SourceT.OTHER,
-                ScopeTypeT.DU_MODULE,
-                FlagsT.ENABLED_STMT | FlagsT.ENABLED_BRANCH
-                | FlagsT.ENABLED_COND | FlagsT.ENABLED_EXPR
-                | FlagsT.ENABLED_FSM | FlagsT.ENABLED_TOGGLE
-                | FlagsT.INST_ONCE | FlagsT.SCOPE_UNDER_DU)
-
-            dst_iscope = dst_parent.createInstance(
-                src_iscope.getScopeName(),
-                src_iscope.getSourceInfo(),
-                1,
-                SourceT.OTHER,
-                ScopeTypeT.INSTANCE,
-                dst_du,
-                FlagsT.INST_ONCE)
-
-            self._merge_covergroups(dst_iscope, src_scopes)
-            self._merge_code_coverage(dst_iscope, src_scopes)
-            # Recurse into nested INSTANCE scopes
-            self._merge_instances_under(dst_iscope, iscope_m[name], dst_root)
-
+    # ------------------------------------------------------------------
+    # History
+    # ------------------------------------------------------------------
     def _merge_history_nodes(self, dst_db, src_db_l: List[UCIS]):
         """Copy history nodes from all source databases into *dst_db*."""
         def _node_key(n):
@@ -140,334 +267,3 @@ class DbMerger(object):
                     dst_hn.setVendorToolVersion(src_hn.getVendorToolVersion())
                 if src_hn.getComment() is not None:
                     dst_hn.setComment(src_hn.getComment())
-
-    def _merge_covergroups(self, dst_scope, src_scopes):
-        
-        cg_name_m : Dict[str,List] = {}
-        cg_name_l = []
-      
-        for i,src_scope in enumerate(src_scopes): 
-            for src_cg in src_scope.scopes(ScopeTypeT.COVERGROUP):
-                name = src_cg.getScopeName()
-                
-                if name not in cg_name_m.keys():
-                    scope_l = [None]*len(src_scopes)
-                    cg_name_m[name] = scope_l
-                    cg_name_l.append(name)
-                cg_name_m[name][i] = src_cg
-
-        for name in cg_name_l:                
-            src_cg_l = list(filter(lambda cg: cg is not None, cg_name_m[name]))
-            
-            # Create the destination using the first covergroup
-            dst_cg = dst_scope.createCovergroup(
-                src_cg_l[0].getScopeName(),
-                src_cg_l[0].getSourceInfo(), # location
-                src_cg_l[0].getWeight(), # weight
-                SourceT.OTHER)
-            self._merge_covergroup(dst_cg, src_cg_l)
-        
-    def _merge_covergroup(self, dst_cg, src_cg_l):
-        
-        dst_cp_m = self._merge_coverpoints(dst_cg, src_cg_l)
-
-        self._merge_crosses(dst_cg, dst_cp_m, src_cg_l)
-        
-        self._merge_coverinsts(dst_cg, src_cg_l)
-
-    def _merge_coverinsts(self, dst_cg, src_cg_l):
-
-        cg_i_m = {}
-        cg_n_l = []
-        
-        for i,src_cg in enumerate(src_cg_l):
-            
-            for src_cg_i in src_cg.scopes(ScopeTypeT.COVERINSTANCE):
-                name = src_cg_i.getScopeName()
-                
-                if name not in cg_i_m.keys():
-                    cg_i_m[name] = [None]*len(src_cg_l)
-                    cg_n_l.append(name)
-                cg_i_m[name][i] = src_cg_i
-                
-        for name in cg_n_l:
-            src_cg_i_l = list(filter(lambda cg : cg is not None, cg_i_m[name]))
-            
-            dst_cg_i = dst_cg.createCoverInstance(
-                        name,
-                        src_cg_i_l[0].getSourceInfo(), # location
-                        src_cg_i_l[0].getWeight(), # weight
-                        SourceT.OTHER)
-            dst_cp_m = self._merge_coverpoints(dst_cg_i, src_cg_i_l)
-
-            self._merge_crosses(dst_cg_i, dst_cp_m, src_cg_i_l)
-
-    def _merge_coverpoints(self, dst_cg, src_cg_l) -> Dict[str,object]:
-        dst_cp_m : Dict[str, object] = {}
-        cp_name_m : Dict[str,List] = {}
-        cp_name_l = []
-        
-        for i,src_cg in enumerate(src_cg_l):
-            for cp in src_cg.scopes(ScopeTypeT.COVERPOINT):
-                name = cp.getScopeName()
-                
-                if name not in cp_name_m.keys():
-                    scope_l = [None]*len(src_cg_l)
-                    cp_name_m[name] = scope_l
-                    cp_name_l.append(name)
-                cp_name_m[name][i] = cp
-                
-        for name in cp_name_l:
-            src_cp_l = list(filter(lambda cp : cp is not None, cp_name_m[name]))
-            
-            dst_cp = dst_cg.createCoverpoint(
-                src_cp_l[0].getScopeName(),
-                src_cp_l[0].getSourceInfo(), # location
-                src_cp_l[0].getWeight(), # weight
-                SourceT.OTHER) # SourceType
-            dst_cp_m[name] = dst_cp
-            
-            self._merge_coverpoint_bins(dst_cp, src_cp_l)
-
-        return dst_cp_m
-    
-    def _merge_coverpoint_bins(self, dst_cp, src_cp_l):
-
-        for bin_t in (CoverTypeT.CVGBIN,CoverTypeT.IGNOREBIN,CoverTypeT.ILLEGALBIN):
-            bin_name_m : Dict[str, List[int]] = {}
-            bin_name_l = []
-            
-            for src_cp in src_cp_l:
-                for ci_n in src_cp.coverItems(bin_t):
-                    cvg_data = ci_n.getCoverData()
-                    name = ci_n.getName()
-                    if name not in bin_name_m.keys():
-                        bin_name_m[name] = [0, cvg_data.at_least]
-                        bin_name_l.append(name)
-                    bin_name_m[name][0] += cvg_data.data
-                    
-            for name in bin_name_l:
-                dst_cp.createBin(
-                    name,
-                    None, # Location
-                    bin_name_m[name][1],
-                    bin_name_m[name][0],
-                    name,
-                    bin_t)
-
-    def _merge_crosses(self, dst_cg, dst_cp_m, src_cg_l):
-
-        cross_m = {}
-        cross_name_l = []
-
-        for i,src_cg in enumerate(src_cg_l):
-            for cr in src_cg.scopes(ScopeTypeT.CROSS):
-                name = cr.getScopeName()
-                if name not in cross_m.keys():
-                    cross_m[name] = []
-                    cross_name_l.append(name)
-                cross_m[name].append(cr)
-
-        for name in cross_name_l:
-            src_cr_l = cross_m[name]
-
-            # Create the destination cross
-            coverpoint_l = []
-            for i in range(src_cr_l[0].getNumCrossedCoverpoints()):
-                src_cp = src_cr_l[0].getIthCrossedCoverpoint(i)
-                if src_cp.getScopeName() in dst_cp_m.keys():
-                    coverpoint_l.append(dst_cp_m[src_cp.getScopeName()])
-                else:
-                    raise Exception("Cannot find coverpoint %s when creating cross %s" % (
-                        src_cp.getName(), name))
-
-            dst_cr = dst_cg.createCross(
-                name,
-                src_cr_l[0].getSourceInfo(),
-                src_cr_l[0].getWeight(), # weight
-                SourceT.OTHER,
-                coverpoint_l)
-
-            self._merge_cross(dst_cr, src_cr_l)
-
-    def _merge_cross(self, dst_cr, src_cr_l):
-
-        for cvg_t in (CoverTypeT.CVGBIN,CoverTypeT.IGNOREBIN,CoverTypeT.ILLEGALBIN):
-            bin_name_m = {}
-            bin_name_l = []
-
-            for src_cr in src_cr_l:
-                for ci in src_cr.coverItems(cvg_t):
-                    bin_n = ci.getName()
-                    cvg_data = ci.getCoverData()
-                    if bin_n not in bin_name_m.keys():
-                        bin_name_m[bin_n] = [0, cvg_data.at_least]
-                        bin_name_l.append(bin_n)
-                    bin_name_m[bin_n][0] += cvg_data.data
-
-            for bin_n in bin_name_l:
-                dst_cr.createBin(
-                    bin_n,
-                    None, # Location
-                    bin_name_m[bin_n][1], # at_least
-                    bin_name_m[bin_n][0], # count
-                    bin_n,
-                    cvg_t)
-    
-    def _merge_code_coverage(self, dst_scope, src_scopes):
-        """Merge code coverage scopes (BLOCK, BRANCH, TOGGLE).
-        
-        Args:
-            dst_scope: Destination instance scope
-            src_scopes: List of source instance scopes
-        """
-        # Merge BLOCK scopes (line/statement coverage)
-        self._merge_scopes_by_type(dst_scope, src_scopes, ScopeTypeT.BLOCK)
-        
-        # Merge BRANCH scopes (branch coverage)
-        self._merge_scopes_by_type(dst_scope, src_scopes, ScopeTypeT.BRANCH)
-        
-        # Merge TOGGLE scopes (toggle coverage)
-        self._merge_scopes_by_type(dst_scope, src_scopes, ScopeTypeT.TOGGLE)
-
-        # Merge FSM scopes (FSM state/transition coverage)
-        self._merge_scopes_by_type(dst_scope, src_scopes, ScopeTypeT.FSM)
-
-        # Merge assertion scopes (assert/cover directives)
-        self._merge_scopes_by_type(dst_scope, src_scopes, ScopeTypeT.ASSERT)
-        self._merge_scopes_by_type(dst_scope, src_scopes, ScopeTypeT.COVER)
-    
-    def _merge_scopes_by_type(self, dst_parent, src_scopes, scope_type):
-        """Merge scopes of a specific type.
-        
-        Args:
-            dst_parent: Destination parent scope
-            src_scopes: List of source parent scopes
-            scope_type: Type of scopes to merge (BLOCK, BRANCH, TOGGLE, etc.)
-        """
-        scope_name_m: Dict[str, List] = {}
-        scope_name_l = []
-        
-        # Collect scopes from all source databases
-        for i, src_scope in enumerate(src_scopes):
-            for src_sub_scope in src_scope.scopes(scope_type):
-                name = src_sub_scope.getScopeName()
-                
-                if name not in scope_name_m:
-                    scope_l = [None] * len(src_scopes)
-                    scope_name_m[name] = scope_l
-                    scope_name_l.append(name)
-                scope_name_m[name][i] = src_sub_scope
-        
-        # Merge each scope
-        for name in scope_name_l:
-            src_scope_l = list(filter(lambda s: s is not None, scope_name_m[name]))
-            
-            # Create destination scope using first source as template
-            src_template = src_scope_l[0]
-            dst_sub_scope = dst_parent.createScope(
-                src_template.getScopeName(),
-                src_template.getSourceInfo(),
-                src_template.getWeight(),
-                SourceT.OTHER,  # source language type
-                src_template.getScopeType(),
-                0  # flags - use default
-            )
-            
-            if scope_type == ScopeTypeT.FSM:
-                # Per LRM: FSMBIN items live in FSM_STATES/FSM_TRANS sub-scopes.
-                # Collect from src sub-scopes; dst.createNextCover() routes correctly.
-                item_name_m: Dict[str, List] = {}
-                item_name_l = []
-                for src_fsm in src_scope_l:
-                    for sub_type in (ScopeTypeT.FSM_STATES, ScopeTypeT.FSM_TRANS):
-                        for sub_scope in src_fsm.scopes(sub_type):
-                            for ci in sub_scope.coverItems(CoverTypeT.FSMBIN):
-                                nm = ci.getName()
-                                cvg = ci.getCoverData()
-                                if nm not in item_name_m:
-                                    item_name_m[nm] = [0, cvg.goal]
-                                    item_name_l.append(nm)
-                                item_name_m[nm][0] += cvg.data
-                for nm in item_name_l:
-                    count, goal = item_name_m[nm]
-                    cd = CoverData(CoverTypeT.FSMBIN, goal)
-                    cd.data = count
-                    dst_sub_scope.createNextCover(nm, cd, None)
-            else:
-                # Merge coverage items
-                self._merge_code_coverage_items(dst_sub_scope, src_scope_l)
-    
-    def _merge_code_coverage_items(self, dst_scope, src_scopes):
-        """Merge code coverage items from multiple source scopes.
-        
-        Handles STMTBIN, BRANCHBIN, TOGGLEBIN, etc.
-        
-        Args:
-            dst_scope: Destination scope
-            src_scopes: List of source scopes with same name
-        """
-        # Coverage types to merge
-        coverage_types = [
-            CoverTypeT.STMTBIN,     # Line/statement coverage
-            CoverTypeT.BRANCHBIN,   # Branch coverage
-            CoverTypeT.TOGGLEBIN,   # Toggle coverage
-            CoverTypeT.EXPRBIN,     # Expression coverage
-            CoverTypeT.CONDBIN,     # Condition coverage
-            CoverTypeT.FSMBIN,      # FSM coverage
-            CoverTypeT.ASSERTBIN,   # Assertion directive bins
-            CoverTypeT.COVERBIN,
-            CoverTypeT.PASSBIN,
-            CoverTypeT.FAILBIN,
-            CoverTypeT.VACUOUSBIN,
-            CoverTypeT.DISABLEDBIN,
-            CoverTypeT.ATTEMPTBIN,
-            CoverTypeT.ACTIVEBIN,
-            CoverTypeT.PEAKACTIVEBIN,
-        ]
-        
-        for cvg_type in coverage_types:
-            item_name_m: Dict[str, List[int]] = {}
-            item_name_l = []
-            
-            # Collect items from all sources
-            for src_scope in src_scopes:
-                for ci in src_scope.coverItems(cvg_type):
-                    item_name = ci.getName()
-                    cvg_data = ci.getCoverData()
-                    
-                    if item_name not in item_name_m:
-                        # [accumulated_count, goal]
-                        item_name_m[item_name] = [0, cvg_data.goal]
-                        item_name_l.append(item_name)
-                    
-                    # Accumulate hit counts
-                    item_name_m[item_name][0] += cvg_data.data
-            
-            # Create merged items in destination
-            for item_name in item_name_l:
-                count, goal = item_name_m[item_name]
-                
-                # Get source info from first occurrence (they should be identical)
-                src_info = None
-                for src_scope in src_scopes:
-                    for ci in src_scope.coverItems(cvg_type):
-                        if ci.getName() == item_name:
-                            src_info = ci.getSourceInfo()
-                            break
-                    if src_info:
-                        break
-                
-                # Create cover data
-                cover_data = CoverData(cvg_type, 0)
-                cover_data.data = count
-                cover_data.goal = goal
-                
-                # Create cover item
-                dst_scope.createNextCover(
-                    item_name,
-                    cover_data,
-                    src_info
-                )
-    
-
